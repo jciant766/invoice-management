@@ -48,16 +48,8 @@ def init_database():
         existing_tf = db.query(Setting).filter(Setting.key == "current_tf_number").first()
         if existing_tf:
             print(f"Database already initialized. Current TF number: {existing_tf.value}")
-            response = input("Do you want to reset the database? (y/N): ")
-            if response.lower() != 'y':
-                print("Initialization cancelled.")
-                return
-
-            # Clear existing data
-            print("Clearing existing data...")
-            db.query(Setting).delete()
-            db.query(Supplier).delete()
-            db.commit()
+            print("Skipping re-initialization.")
+            return
 
         # Seed TF counter
         print(f"Setting initial TF counter to: {INITIAL_TF_NUMBER}")
@@ -80,7 +72,6 @@ def init_database():
         print(f"\nDatabase initialized successfully!")
         print(f"  - TF counter set to: {INITIAL_TF_NUMBER}")
         print(f"  - Suppliers added: {supplier_count}")
-        print(f"\nYou can now run the application with: python main.py")
 
     except Exception as e:
         print(f"Error initializing database: {e}")
