@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sliema Local Council{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'malta-blue': '#1e3a8a',
+                        'malta-blue-dark': '#1e2f5c',
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-malta-blue text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <svg class="w-10 h-10 mr-3" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                        </svg>
+                        <div>
+                            <h1 class="text-xl font-bold">Sliema Local Council</h1>
+                            <p class="text-sm text-blue-200">Invoice Management System</p>
+                        </div>
+                    </div>
+                </div>
+                <nav class="flex items-center space-x-1">
+                    <a href="/invoices" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition {% if request.url.path.startswith('/invoices') and 'create' not in request.url.path and 'edit' not in request.url.path %}bg-malta-blue-dark{% endif %}">
+                        Invoices
+                    </a>
+                    <a href="/invoices/create" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition {% if 'create' in request.url.path %}bg-malta-blue-dark{% endif %}">
+                        + New Invoice
+                    </a>
+                    <div class="relative group">
+                        <button class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition flex items-center">
+                            Export
+                            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 hidden group-hover:block z-50">
+                            <a href="/export/excel" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                Excel - All
+                            </a>
+                            <a href="/export/excel?approved_only=true" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                Excel - Approved Only
+                            </a>
+                            <a href="/export/pending/excel" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                Excel - Pending Only
+                            </a>
+                            <hr class="my-2">
+                            <a href="/export/pdf" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                PDF - All
+                            </a>
+                            <a href="/export/pdf?approved_only=true" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                PDF - Approved Only
+                            </a>
+                            <a href="/export/pending/pdf" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                PDF - Pending Only
+                            </a>
+                        </div>
+                    </div>
+                    <a href="/settings" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition {% if request.url.path.startswith('/settings') %}bg-malta-blue-dark{% endif %}">
+                        Settings
+                    </a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-100 border-t mt-auto">
+        <div class="max-w-7xl mx-auto px-4 py-4 text-center text-gray-500 text-sm">
+            &copy; 2025 Sliema Local Council. Invoice Management System.
+        </div>
+    </footer>
+
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

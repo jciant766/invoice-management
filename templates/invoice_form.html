@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_edit %}Edit Invoice{% else %}New Invoice{% endif %} - Sliema Local Council{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Page Header -->
+    <div class="mb-6">
+        <a href="/invoices" class="text-malta-blue hover:underline text-sm">&larr; Back to list</a>
+        <h2 class="text-2xl font-bold text-gray-800 mt-2">
+            {% if is_edit %}Edit Invoice{% else %}New Invoice{% endif %}
+        </h2>
+        {% if is_edit and invoice.tf_number %}
+        <p class="text-sm text-gray-500 mt-1">
+            TF Number: <span class="font-medium text-malta-blue">{{ invoice.tf_number }}</span>
+        </p>
+        {% endif %}
+    </div>
+
+    {% if warning %}
+    <div class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg mb-6">
+        <strong>Warning:</strong> {{ warning }}
+    </div>
+    {% endif %}
+
+    <!-- Form -->
+    <form method="POST" action="{% if is_edit %}/invoices/{{ invoice.id }}/edit{% else %}/invoices/create{% endif %}" class="bg-white rounded-lg shadow p-6 space-y-6">
+
+        <!-- Supplier Section -->
+        <div class="border-b pb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Supplier Details</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Supplier *</label>
+                    <select name="supplier_id" id="supplierSelect" onchange="toggleNewSupplier()" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.supplier_id %}border-red-500{% endif %}">
+                        <option value="">-- Select Supplier --</option>
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}" {% if (invoice and invoice.supplier_id == supplier.id) or (form_data and form_data.supplier_id == supplier.id) %}selected{% endif %}>
+                            {{ supplier.name }}
+                        </option>
+                        {% endfor %}
+                        <option value="-1" {% if form_data and form_data.supplier_id == -1 %}selected{% endif %}>+ Add New Supplier</option>
+                    </select>
+                    {% if errors.supplier_id %}
+                    <p class="text-red-500 text-sm mt-1">{{ errors.supplier_id }}</p>
+                    {% endif %}
+                </div>
+                <div id="newSupplierDiv" class="{% if not (form_data and form_data.supplier_id == -1) %}hidden{% endif %}">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">New Supplier Name *</label>
+                    <input type="text" name="new_supplier_name" value="{{ form_data.new_supplier_name if form_data else '' }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.new_supplier_name %}border-red-500{% endif %}">
+                    {% if errors.new_supplier_name %}
+                    <p class="text-red-500 text-sm mt-1">{{ errors.new_supplier_name }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Amount Section -->
+        <div class="border-b pb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Amounts</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Amount (EUR) *</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2 text-gray-500">&euro;</span>
+                        <input type="number" name="invoice_amount" step="0.01" min="0.01" required
+                            value="{{ '%.2f'|format(invoice.invoice_amount) if invoice else (form_data.invoice_amount if form_data else '') }}"
+                            onchange="copyToPayment()"
+                            class="w-full pl-8 rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.invoice_amount %}border-red-500{% endif %}">
+                    </div>
+                    {% if errors.invoice_amount %}
+                    <p class="text-red-500 text-sm mt-1">{{ errors.invoice_amount }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Payment Amount (EUR) *</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2 text-gray-500">&euro;</span>
+                        <input type="number" name="payment_amount" id="paymentAmount" step="0.01" min="0.01" required
+                            value="{{ '%.2f'|format(invoice.payment_amount) if invoice else (form_data.payment_amount if form_data else '') }}"
+                            class="w-full pl-8 rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.payment_amount %}border-red-500{% endif %}">
+                    </div>
+                    {% if errors.payment_amount %}
+                    <p class="text-red-500 text-sm mt-1">{{ errors.payment_amount }}</p>
+                    {% endif %}
+                    <p class="text-xs text-gray-500 mt-1">Usually the same as invoice amount</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Method Section -->
+        <div class="border-b pb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Method</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Request Method *</label>
+                    <select name="method_request" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                        {% for code, desc in method_request_codes.items() %}
+                        <option value="{{ code }}" {% if (invoice and invoice.method_request == code) or (form_data and form_data.method_request == code) %}selected{% endif %}>
+                            {{ code }} - {{ desc }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Procurement Method *</label>
+                    <select name="method_procurement" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                        {% for code, desc in method_procurement_codes.items() %}
+                        <option value="{{ code }}" {% if (invoice and invoice.method_procurement == code) or (form_data and form_data.method_procurement == code) %}selected{% endif %}>
+                            {{ code }} - {{ desc }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Details Section -->
+        <div class="border-b pb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Invoice Details</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                    <textarea name="description" rows="3" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.description %}border-red-500{% endif %}" placeholder="Description of the invoice for public viewing...">{{ invoice.description if invoice else (form_data.description if form_data else '') }}</textarea>
+                    {% if errors.description %}
+                    <p class="text-red-500 text-sm mt-1">{{ errors.description }}</p>
+                    {% endif %}
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Date *</label>
+                        <input type="date" name="invoice_date" required
+                            value="{{ invoice.invoice_date.strftime('%Y-%m-%d') if invoice and invoice.invoice_date else (form_data.invoice_date if form_data else '') }}"
+                            max="{{ today if today else '' }}"
+                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.invoice_date %}border-red-500{% endif %}">
+                        {% if errors.invoice_date %}
+                        <p class="text-red-500 text-sm mt-1">{{ errors.invoice_date }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Number *</label>
+                        <input type="text" name="invoice_number" required
+                            value="{{ invoice.invoice_number if invoice else (form_data.invoice_number if form_data else '') }}"
+                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.invoice_number %}border-red-500{% endif %}">
+                        {% if errors.invoice_number %}
+                        <p class="text-red-500 text-sm mt-1">{{ errors.invoice_number }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reference Numbers Section -->
+        <div class="border-b pb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Reference Numbers</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">PJV Number *</label>
+                    <input type="text" name="pjv_number" required
+                        value="{{ invoice.pjv_number if invoice else (form_data.pjv_number if form_data else '') }}"
+                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.pjv_number %}border-red-500{% endif %}"
+                        placeholder="Stamp number when invoice was received">
+                    {% if errors.pjv_number %}
+                    <p class="text-red-500 text-sm mt-1">{{ errors.pjv_number }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">PO Number (Optional)</label>
+                    <input type="text" name="po_number"
+                        value="{{ invoice.po_number if invoice else (form_data.po_number if form_data else '') }}"
+                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue"
+                        placeholder="Purchase Order number if available">
+                </div>
+            </div>
+        </div>
+
+        <!-- Approval Section -->
+        <div class="{% if invoice and invoice.is_approved %}bg-green-50 -mx-6 -mb-6 p-6 rounded-b-lg{% endif %}">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">
+                Approval
+                {% if invoice and invoice.is_approved %}
+                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Approved
+                </span>
+                {% endif %}
+            </h3>
+
+            {% if invoice and invoice.is_approved %}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">TF Number</label>
+                    <p class="text-lg font-bold text-malta-blue">{{ invoice.tf_number }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Proposer Councillor</label>
+                    <input type="text" name="proposer_councillor" value="{{ invoice.proposer_councillor }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Seconder Councillor</label>
+                    <input type="text" name="seconder_councillor" value="{{ invoice.seconder_councillor }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                </div>
+            </div>
+            <input type="hidden" name="is_approved" value="true">
+            {% else %}
+            <div class="space-y-4">
+                <div class="flex items-center">
+                    <input type="checkbox" name="is_approved" id="approveCheckbox" value="true" onchange="toggleApprovalFields()"
+                        class="h-4 w-4 text-malta-blue focus:ring-malta-blue border-gray-300 rounded">
+                    <label for="approveCheckbox" class="ml-2 text-sm text-gray-700">
+                        Approve this invoice (TF number will be assigned automatically)
+                    </label>
+                </div>
+                <p class="text-sm text-gray-500">
+                    Next TF number: <strong class="text-malta-blue">{{ next_tf_number }}</strong>
+                </p>
+                <div id="approvalFields" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 bg-green-50 rounded-lg">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Proposer Councillor *</label>
+                        <input type="text" name="proposer_councillor" id="proposerInput"
+                            value="{{ form_data.proposer_councillor if form_data else '' }}"
+                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.proposer_councillor %}border-red-500{% endif %}">
+                        {% if errors.proposer_councillor %}
+                        <p class="text-red-500 text-sm mt-1">{{ errors.proposer_councillor }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Seconder Councillor *</label>
+                        <input type="text" name="seconder_councillor" id="seconderInput"
+                            value="{{ form_data.seconder_councillor if form_data else '' }}"
+                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.seconder_councillor %}border-red-500{% endif %}">
+                        {% if errors.seconder_councillor %}
+                        <p class="text-red-500 text-sm mt-1">{{ errors.seconder_councillor }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Form Actions -->
+        <div class="flex justify-between pt-6 border-t">
+            <a href="/invoices" class="px-6 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                Cancel
+            </a>
+            <button type="submit" class="px-6 py-2 text-white bg-malta-blue rounded-lg hover:bg-malta-blue-dark transition">
+                {% if is_edit %}Update Invoice{% else %}Create Invoice{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleNewSupplier() {
+    const select = document.getElementById('supplierSelect');
+    const newSupplierDiv = document.getElementById('newSupplierDiv');
+    if (select.value === '-1') {
+        newSupplierDiv.classList.remove('hidden');
+    } else {
+        newSupplierDiv.classList.add('hidden');
+    }
+}
+
+function copyToPayment() {
+    const invoiceAmount = document.querySelector('input[name="invoice_amount"]').value;
+    const paymentInput = document.getElementById('paymentAmount');
+    if (!paymentInput.value || paymentInput.value === '0' || paymentInput.value === '0.00') {
+        paymentInput.value = invoiceAmount;
+    }
+}
+
+function toggleApprovalFields() {
+    const checkbox = document.getElementById('approveCheckbox');
+    const fields = document.getElementById('approvalFields');
+    const proposerInput = document.getElementById('proposerInput');
+    const seconderInput = document.getElementById('seconderInput');
+
+    if (checkbox.checked) {
+        fields.classList.remove('hidden');
+        fields.classList.add('grid');
+        proposerInput.required = true;
+        seconderInput.required = true;
+    } else {
+        fields.classList.add('hidden');
+        fields.classList.remove('grid');
+        proposerInput.required = false;
+        seconderInput.required = false;
+    }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Ctrl+S to save
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        document.querySelector('form').submit();
+    }
+    // Escape to go back
+    if (e.key === 'Escape') {
+        window.location.href = '/invoices';
+    }
+});
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleNewSupplier();
+    {% if form_data and form_data.is_approved %}
+    document.getElementById('approveCheckbox').checked = true;
+    toggleApprovalFields();
+    {% endif %}
+});
+</script>
+{% endblock %}
