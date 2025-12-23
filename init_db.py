@@ -165,11 +165,5 @@ if __name__ == "__main__":
 
     init_database()
 
-    # Ask about sample data
-    print()
-    response = input("Do you want to add sample invoices for testing? (y/N): ")
-    if response.lower() == 'y':
-        add_sample_invoices()
-
     print()
     print("Setup complete!")
