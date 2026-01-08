@@ -33,6 +33,10 @@ load_dotenv()
 # This brings in the database connection and table definitions
 from database import engine, Base
 
+# --- IMPORT ERROR HANDLING ---
+# This catches errors and makes them user-friendly
+from error_handlers import app_error_handler, AppError
+
 # --- IMPORT ALL THE PAGES/FEATURES ---
 # Each "router" handles a different section of the website:
 #   - invoices: Main invoice list and forms
@@ -76,6 +80,12 @@ app.include_router(suppliers.router)
 app.include_router(exports.router)
 app.include_router(settings.router)
 app.include_router(email_processing.router)
+
+# --- REGISTER ERROR HANDLERS ---
+# This catches all errors and converts them to user-friendly messages
+# instead of showing ugly Chrome error pages
+app.add_exception_handler(AppError, app_error_handler)
+app.add_exception_handler(Exception, app_error_handler)
 
 
 # --- HOME PAGE ---

@@ -3,15 +3,164 @@
  * Kunsill Lokali Tas-Sliema
  */
 
-// Toast notification system
+// ========================================
+// ERROR HANDLING SYSTEM
+// ========================================
+// This replaces ugly Chrome error pages with nice user-friendly messages
+
+/**
+ * Handle API errors from the backend
+ * Automatically detects error format and displays appropriately
+ *
+ * Usage:
+ *   const response = await fetch('/email/parse/123');
+ *   if (!response.ok) {
+ *       handleApiError(response);
+ *       return;
+ *   }
+ */
+async function handleApiError(response) {
+    try {
+        const error = await response.json();
+
+        // Check if it's our standardized error format
+        if (error.error && error.error.message) {
+            showErrorModal({
+                title: getErrorTitle(error.error.type),
+                message: error.error.message,
+                details: error.error.details,
+                action: error.error.user_action
+            });
+        } else if (error.error) {
+            // Fallback for old error format
+            showToast(error.error, 'error');
+        } else {
+            // Generic error
+            showToast('An error occurred. Please try again.', 'error');
+        }
+    } catch (e) {
+        // If we can't parse the error response, show generic message
+        showToast(`Error: ${response.status} - ${response.statusText}`, 'error');
+    }
+}
+
+/**
+ * Get a friendly error title based on error type
+ */
+function getErrorTitle(errorType) {
+    const titles = {
+        'validation_error': 'Validation Error',
+        'ai_parsing_error': 'Unable to Parse Email',
+        'database_error': 'Database Error',
+        'email_service_error': 'Email Service Error',
+        'not_found': 'Not Found',
+        'internal_error': 'Server Error',
+        'http_error': 'Request Error'
+    };
+    return titles[errorType] || 'Error';
+}
+
+/**
+ * Show detailed error modal
+ * This is better than a toast for errors with detailed info
+ */
+function showErrorModal({title, message, details = {}, action = null}) {
+    // Remove existing error modal if any
+    const existing = document.getElementById('errorModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'errorModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <!-- Error Icon -->
+            <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+
+            <!-- Error Title -->
+            <h3 class="text-lg font-bold text-gray-900 text-center mb-2">${title}</h3>
+
+            <!-- Error Message -->
+            <p class="text-gray-700 text-center mb-4">${message}</p>
+
+            <!-- User Action (what to do) -->
+            ${action ? `
+                <div class="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
+                    <p class="text-sm text-blue-700">
+                        <strong>What to do:</strong> ${action}
+                    </p>
+                </div>
+            ` : ''}
+
+            <!-- Details (for debugging) -->
+            ${Object.keys(details).length > 0 ? `
+                <details class="mb-4">
+                    <summary class="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
+                        Show technical details
+                    </summary>
+                    <pre class="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto">${JSON.stringify(details, null, 2)}</pre>
+                </details>
+            ` : ''}
+
+            <!-- Close Button -->
+            <button onclick="document.getElementById('errorModal').remove()"
+                    class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
+                Close
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Click outside to close
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+
+    // ESC key to close
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            modal.remove();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+}
+
+// ========================================
+// TOAST NOTIFICATION SYSTEM
+// ========================================
+// For quick success/info messages
+
+// Toast notification system (enhanced)
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.textContent = message;
+
+    // Add icon based on type
+    const icons = {
+        'success': '✓',
+        'error': '✕',
+        'info': 'ℹ',
+        'warning': '⚠'
+    };
+
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || ''}</span>
+        <span>${message}</span>
+    `;
+
     document.body.appendChild(toast);
 
     setTimeout(() => {
-        toast.remove();
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
 
