@@ -36,11 +36,20 @@
                     </div>
                 </div>
                 <nav class="flex items-center space-x-1">
-                    <a href="/invoices" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition {% if request.url.path.startswith('/invoices') and 'create' not in request.url.path and 'edit' not in request.url.path %}bg-malta-blue-dark{% endif %}">
+                    <a href="/invoices" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition {% if request.url.path == '/invoices' %}bg-malta-blue-dark{% endif %}">
                         Invoices
+                    </a>
+                    <a href="/email" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition flex items-center gap-1 {% if request.url.path.startswith('/email') %}bg-malta-blue-dark{% endif %}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        Emails
                     </a>
                     <a href="/invoices/create" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition {% if 'create' in request.url.path %}bg-malta-blue-dark{% endif %}">
                         + New Invoice
+                    </a>
+                    <a href="/suppliers" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition {% if request.url.path.startswith('/suppliers') %}bg-malta-blue-dark{% endif %}">
+                        Suppliers
                     </a>
                     <div class="relative group">
                         <button class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition flex items-center">
@@ -50,6 +59,15 @@
                             </svg>
                         </button>
                         <div class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 hidden group-hover:block z-50">
+                            <p class="px-4 py-1 text-xs text-gray-500 uppercase">CSV</p>
+                            <a href="/export/csv" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                CSV - All
+                            </a>
+                            <a href="/export/csv?approved_only=true" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                CSV - Approved Only
+                            </a>
+                            <hr class="my-2">
+                            <p class="px-4 py-1 text-xs text-gray-500 uppercase">Excel</p>
                             <a href="/export/excel" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
                                 Excel - All
                             </a>
@@ -57,9 +75,10 @@
                                 Excel - Approved Only
                             </a>
                             <a href="/export/pending/excel" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                Excel - Pending Only
+                                Excel - Not Approved Only
                             </a>
                             <hr class="my-2">
+                            <p class="px-4 py-1 text-xs text-gray-500 uppercase">PDF</p>
                             <a href="/export/pdf" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
                                 PDF - All
                             </a>
@@ -67,7 +86,7 @@
                                 PDF - Approved Only
                             </a>
                             <a href="/export/pending/pdf" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                PDF - Pending Only
+                                PDF - Not Approved Only
                             </a>
                         </div>
                     </div>

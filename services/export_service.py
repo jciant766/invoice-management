@@ -5,7 +5,8 @@ Generates Schedule of Payments (Skeda tal-Hlasijiet) in the exact format
 required by Malta's Department of Local Government (DLG).
 """
 
-from io import BytesIO
+import csv
+from io import BytesIO, StringIO
 from datetime import datetime
 from typing import List, Optional
 from openpyxl import Workbook
@@ -401,9 +402,89 @@ def generate_schedule_pdf(
     return buffer
 
 
-def get_export_filename(file_type: str, approved_only: bool = False) -> str:
+def generate_schedule_csv(
+    invoices: List[Invoice],
+    sitting_number: Optional[str] = None
+) -> BytesIO:
+    """
+    Generate CSV file for data export.
+
+    Args:
+        invoices: List of Invoice objects to export
+        sitting_number: Council sitting number
+
+    Returns:
+        BytesIO: CSV file as bytes buffer
+    """
+    output = StringIO()
+    writer = csv.writer(output)
+
+    # Headers
+    headers = [
+        "Sitting No",
+        "Supplier Code",
+        "#",
+        "Supplier",
+        "Invoice Amount",
+        "Payment Amount",
+        "Method Request",
+        "Method Procurement",
+        "Description",
+        "Invoice Date",
+        "Invoice Number",
+        "PO Number",
+        "PJV Number",
+        "TF Number",
+        "Status",
+        "Approved Date",
+        "Proposer",
+        "Seconder",
+        "Fiscal Receipt"
+    ]
+    writer.writerow(headers)
+
+    # Data rows
+    for idx, invoice in enumerate(invoices, start=1):
+        row = [
+            sitting_number or "",
+            invoice.supplier_id,
+            idx,
+            invoice.supplier.name,
+            float(invoice.invoice_amount),
+            float(invoice.payment_amount),
+            invoice.method_request,
+            invoice.method_procurement,
+            invoice.description,
+            invoice.invoice_date.strftime('%d/%m/%Y') if invoice.invoice_date else "",
+            invoice.invoice_number,
+            invoice.po_number or "",
+            invoice.pjv_number,
+            invoice.tf_number or "",
+            "Approved" if invoice.is_approved else "Pending",
+            invoice.approved_date.strftime('%d/%m/%Y') if invoice.approved_date else "",
+            invoice.proposer_councillor or "",
+            invoice.seconder_councillor or "",
+            "Yes" if invoice.fiscal_receipt_path else "No"
+        ]
+        writer.writerow(row)
+
+    # Totals row
+    total_invoice = sum(float(inv.invoice_amount) for inv in invoices)
+    total_payment = sum(float(inv.payment_amount) for inv in invoices)
+    writer.writerow([])
+    writer.writerow(["", "", "", "TOTAL", total_invoice, total_payment, "", "", "", "", "", "", "", "", "", "", "", "", ""])
+
+    # Convert to bytes
+    buffer = BytesIO()
+    buffer.write(output.getvalue().encode('utf-8-sig'))  # UTF-8 with BOM for Excel compatibility
+    buffer.seek(0)
+
+    return buffer
+
+
+def get_export_filename(file_type: str, approved_only: bool = False, prefix: str = "Schedule_of_Payments") -> str:
     """Generate filename for export."""
     now = datetime.now()
     month_year = now.strftime("%B_%Y")
     suffix = "_Approved" if approved_only else "_All"
-    return f"Schedule_of_Payments_{month_year}{suffix}.{file_type}"
+    return f"{prefix}_{month_year}{suffix}.{file_type}"

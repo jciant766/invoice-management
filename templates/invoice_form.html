@@ -186,7 +186,7 @@
             </h3>
 
             {% if invoice and invoice.is_approved %}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">TF Number</label>
                     <p class="text-lg font-bold text-malta-blue">{{ invoice.tf_number }}</p>
@@ -199,6 +199,13 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Seconder Councillor</label>
                     <input type="text" name="seconder_councillor" value="{{ invoice.seconder_councillor }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
                 </div>
+            </div>
+            <!-- Unapprove Button -->
+            <div class="mt-4 pt-4 border-t border-green-200">
+                <p class="text-sm text-gray-600 mb-2">Need to make changes? You can unapprove this invoice to edit it.</p>
+                <button type="button" onclick="confirmUnapprove()" class="px-4 py-2 text-amber-700 bg-amber-100 rounded-lg hover:bg-amber-200 transition text-sm">
+                    Unapprove Invoice
+                </button>
             </div>
             <input type="hidden" name="is_approved" value="true">
             {% else %}
@@ -286,6 +293,18 @@ function toggleApprovalFields() {
         fields.classList.remove('grid');
         proposerInput.required = false;
         seconderInput.required = false;
+    }
+}
+
+// Unapprove confirmation
+function confirmUnapprove() {
+    if (confirm('Are you sure you want to unapprove this invoice?\n\nThis will:\n- Remove the TF number\n- Clear the approval status\n- Allow you to edit and re-approve later\n\nContinue?')) {
+        // Submit unapprove form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/invoices/{{ invoice.id if invoice else 0 }}/unapprove';
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 

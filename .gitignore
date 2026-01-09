@@ -29,3 +29,17 @@ venv/
 .DS_Store
 .nyc_output/
 coverage/
+
+# Credentials and tokens (sensitive)
+credentials.json
+token.json
+
+# Uploaded files
+uploads/
+
+# Local poppler installation (installed via apt in Docker)
+poppler/
+poppler.zip
+
+# Temp files
+nul

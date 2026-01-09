@@ -9,6 +9,8 @@ class Supplier(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(255), nullable=False, unique=True)
+    contact_email = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
 
     invoices = relationship("Invoice", back_populates="supplier")
@@ -62,6 +64,13 @@ class Invoice(Base):
     # Soft delete
     is_deleted = Column(Boolean, default=False)
 
+    # Fiscal receipt attachment
+    fiscal_receipt_path = Column(String(500), nullable=True)
+
+    # Email source tracking (for AI-created invoices)
+    source_email_id = Column(String(255), nullable=True)
+    is_ai_generated = Column(Boolean, default=False)
+
     # Relationships
     supplier = relationship("Supplier", back_populates="invoices")
 
@@ -108,3 +117,4 @@ METHOD_PROCUREMENT_CODES = {
     'K': 'Kwotazzjoni (Quotation)',
     'R': 'Refund'
 }
+

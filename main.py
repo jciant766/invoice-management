@@ -44,7 +44,8 @@ from error_handlers import app_error_handler, AppError
 #   - exports: Creating Excel schedules
 #   - settings: App settings and TF numbers
 #   - email_processing: AI email parsing
-from routes import invoices, exports, settings, email_processing, suppliers
+#   - auth: OAuth login/logout for email providers
+from routes import invoices, exports, settings, email_processing, suppliers, auth
 
 # --- CREATE DATABASE TABLES ---
 # If the database doesn't exist, this creates it with all the tables
@@ -75,11 +76,13 @@ templates = Jinja2Templates(directory="templates")
 #   /exports/...    -> export schedules
 #   /settings/...   -> settings page
 #   /email/...      -> email processing
+#   /auth/...       -> OAuth login/logout
 app.include_router(invoices.router)
 app.include_router(suppliers.router)
 app.include_router(exports.router)
 app.include_router(settings.router)
 app.include_router(email_processing.router)
+app.include_router(auth.router)
 
 # --- REGISTER ERROR HANDLERS ---
 # This catches all errors and converts them to user-friendly messages
@@ -154,7 +157,7 @@ async def server_error_handler(request: Request, exc):
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",           # Tell uvicorn where to find the app
-        host="0.0.0.0",       # Listen on all network interfaces (allows access from other devices)
+        host="127.0.0.1",     # Listen on localhost only
         port=8000,            # The port to run on (http://localhost:8000)
         reload=True           # Auto-restart when you change code (helpful during development)
     )

@@ -5,11 +5,19 @@
 {% block content %}
 <div class="space-y-6">
     <!-- Page Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex justify-between items-center flex-wrap gap-4">
         <h2 class="text-2xl font-bold text-gray-800">Invoice List</h2>
-        <a href="/invoices/create" class="bg-malta-blue text-white px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition">
-            + New Invoice
-        </a>
+        <div class="flex gap-2 flex-wrap">
+            <a href="/email" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                </svg>
+                Process Emails
+            </a>
+            <a href="/invoices/create" class="bg-malta-blue text-white px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition">
+                + New Invoice
+            </a>
+        </div>
     </div>
 
     <!-- Filters -->
@@ -19,18 +27,55 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select name="status" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
                     <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All</option>
-                    <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Not Approved</option>
                     <option value="approved" {% if filters.status == 'approved' %}selected{% endif %}>Approved</option>
                 </select>
             </div>
-            <div class="flex-1 min-w-[150px]">
+            <div class="flex-1 min-w-[150px] relative">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                <select name="supplier_id" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
-                    <option value="">All Suppliers</option>
-                    {% for supplier in suppliers %}
-                    <option value="{{ supplier.id }}" {% if filters.supplier_id == supplier.id %}selected{% endif %}>{{ supplier.name }}</option>
-                    {% endfor %}
-                </select>
+                <input type="hidden" name="supplier_id" id="supplierFilterValue" value="{{ filters.supplier_id or '' }}">
+                <div class="relative">
+                    <button type="button" id="supplierFilterBtn" onclick="toggleSupplierDropdown()"
+                            class="w-full text-left rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue bg-white px-3 py-2 border flex justify-between items-center">
+                        <span id="supplierFilterDisplay">
+                            {% if filters.supplier_id %}
+                                {% for supplier in suppliers %}
+                                    {% if supplier.id == filters.supplier_id %}{{ supplier.name }}{% endif %}
+                                {% endfor %}
+                            {% else %}
+                                All Suppliers
+                            {% endif %}
+                        </span>
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="supplierFilterDropdown" class="hidden absolute z-50 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 max-h-80 overflow-hidden">
+                        <div class="p-2 border-b sticky top-0 bg-white">
+                            <input type="text" id="supplierFilterSearch" placeholder="Search suppliers..."
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-malta-blue focus:ring-malta-blue"
+                                   onkeyup="filterSupplierOptions()">
+                        </div>
+                        <div class="overflow-y-auto max-h-64" id="supplierFilterOptions">
+                            <div class="supplier-option px-3 py-2 cursor-pointer hover:bg-blue-50 bg-gray-50 border-b-2 border-gray-200 font-semibold text-malta-blue"
+                                 onclick="selectSupplierFilter('', 'All Suppliers')">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                    </svg>
+                                    All Suppliers
+                                </div>
+                            </div>
+                            {% for supplier in suppliers %}
+                            <div class="supplier-option px-3 py-2 cursor-pointer hover:bg-gray-100"
+                                 data-name="{{ supplier.name }}"
+                                 onclick="selectSupplierFilter('{{ supplier.id }}', '{{ supplier.name | e }}')">
+                                {{ supplier.name }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="flex-1 min-w-[150px]">
                 <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
@@ -51,6 +96,59 @@
         </form>
     </div>
 
+    <!-- Action Buttons -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <div class="flex flex-wrap gap-3 items-center justify-between">
+            <!-- Bulk Actions -->
+            <div class="flex gap-2 items-center">
+                <span class="text-sm text-gray-600">Selected: <strong id="selectedCount">0</strong></span>
+                <button onclick="bulkApprove()" id="bulkApproveBtn" disabled class="bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                    Approve Selected
+                </button>
+                <button onclick="bulkUnapprove()" id="bulkUnapproveBtn" disabled class="bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                    Unapprove Selected
+                </button>
+            </div>
+
+            <!-- Export Buttons -->
+            <div class="flex gap-2 flex-wrap">
+                <div class="relative inline-block" id="exportSelectedDropdown">
+                    <button onclick="toggleExportSelectedDropdown()" id="exportSelectedBtn" disabled class="bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        Export Selected
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="exportSelectedMenu" class="hidden absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg z-10 py-1">
+                        <button onclick="exportSelected('csv')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">CSV</button>
+                        <button onclick="exportSelected('excel')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Excel</button>
+                        <button onclick="exportSelected('pdf')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">PDF</button>
+                    </div>
+                </div>
+
+                <div class="relative inline-block" id="exportAllDropdown">
+                    <button onclick="toggleExportAllDropdown()" class="bg-gray-600 text-white px-3 py-1.5 rounded-lg hover:bg-gray-700 transition text-sm flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        Export All
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="exportAllMenu" class="hidden absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg z-10 py-1">
+                        <a href="/export/csv?status={{ filters.status }}&supplier_id={{ filters.supplier_id or '' }}&date_from={{ filters.date_from or '' }}&date_to={{ filters.date_to or '' }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">CSV</a>
+                        <a href="/export/excel" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Excel</a>
+                        <a href="/export/pdf" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">PDF</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Summary -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div class="bg-white rounded-lg shadow p-4">
@@ -66,7 +164,7 @@
             <p class="text-2xl font-bold text-green-600">&euro;{{ "%.2f"|format(totals.payment_amount) }}</p>
         </div>
         <div class="bg-white rounded-lg shadow p-4">
-            <p class="text-sm text-gray-500">Pending Approval</p>
+            <p class="text-sm text-gray-500">Not Approved</p>
             <p class="text-2xl font-bold text-amber-600">{{ invoices|selectattr('is_approved', 'false')|list|length }}</p>
         </div>
     </div>
@@ -74,9 +172,12 @@
     <!-- Invoice Table -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+            <table class="min-w-full divide-y divide-gray-200" id="invoicesTable">
                 <thead class="bg-gray-50">
                     <tr>
+                        <th scope="col" class="px-3 py-3 text-center">
+                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="rounded border-gray-300 text-malta-blue focus:ring-malta-blue">
+                        </th>
                         <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             <a href="?sort_by=supplier_id&sort_order={% if filters.sort_by == 'supplier_id' and filters.sort_order == 'asc' %}desc{% else %}asc{% endif %}&status={{ filters.status }}" class="hover:text-gray-700">
                                 Supplier
@@ -106,6 +207,9 @@
                         <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                             TF #
                         </th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Receipt
+                        </th>
                         <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Actions
                         </th>
@@ -113,13 +217,19 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for invoice in invoices %}
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50" data-invoice-id="{{ invoice.id }}" data-is-pending="{{ 'true' if not invoice.is_approved else 'false' }}">
+                        <td class="px-3 py-3 text-center">
+                            <input type="checkbox" class="invoice-checkbox rounded border-gray-300 text-malta-blue focus:ring-malta-blue" value="{{ invoice.id }}" onchange="updateSelectedCount()">
+                        </td>
                         <td class="px-4 py-3 whitespace-nowrap">
                             <div class="text-sm font-medium text-gray-900">{{ invoice.supplier.name }}</div>
                             <div class="text-xs text-gray-500">{{ invoice.method_request }} / {{ invoice.method_procurement }}</div>
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                             {{ invoice.invoice_number }}
+                            {% if invoice.is_ai_generated %}
+                            <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800" title="Created from email">AI</span>
+                            {% endif %}
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
                             &euro;{{ "%.2f"|format(invoice.payment_amount) }}
@@ -137,7 +247,7 @@
                             </span>
                             {% else %}
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                                Pending
+                                Not Approved
                             </span>
                             {% endif %}
                         </td>
@@ -146,6 +256,21 @@
                             <span class="text-malta-blue">{{ invoice.tf_number }}</span>
                             {% else %}
                             <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-center">
+                            {% if invoice.fiscal_receipt_path %}
+                            <button onclick="showReceiptModal({{ invoice.id }}, '{{ invoice.pjv_number }}')" class="text-green-600 hover:text-green-800" title="View Receipt">
+                                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </button>
+                            {% else %}
+                            <button onclick="showUploadModal({{ invoice.id }}, '{{ invoice.pjv_number }}')" class="text-gray-400 hover:text-gray-600" title="Upload Receipt">
+                                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                                </svg>
+                            </button>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-right text-sm">
@@ -172,7 +297,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" class="px-4 py-8 text-center text-gray-500">
+                        <td colspan="10" class="px-4 py-8 text-center text-gray-500">
                             No invoices found. <a href="/invoices/create" class="text-malta-blue hover:underline">Create a new one</a>.
                         </td>
                     </tr>
@@ -235,10 +360,249 @@
         </form>
     </div>
 </div>
+
+<!-- Receipt Upload Modal -->
+<div id="uploadModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4">Upload Fiscal Receipt</h3>
+        <p class="text-gray-600 mb-4">
+            Upload fiscal receipt for PJV: <strong id="uploadPjv"></strong>
+        </p>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <input type="hidden" id="uploadInvoiceId" name="invoice_id">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Select File (PDF, JPG, PNG)</label>
+                <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-malta-blue file:text-white hover:file:bg-malta-blue-dark">
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="hideUploadModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 text-white bg-malta-blue rounded-lg hover:bg-malta-blue-dark">
+                    Upload
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Receipt View Modal -->
+<div id="receiptModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 p-6 max-h-[90vh] flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-gray-900">Fiscal Receipt - <span id="receiptPjv"></span></h3>
+            <button onclick="hideReceiptModal()" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="flex-1 overflow-auto mb-4">
+            <iframe id="receiptFrame" class="w-full h-[60vh] border rounded-lg"></iframe>
+        </div>
+        <div class="flex justify-between">
+            <button onclick="deleteReceipt()" class="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700">
+                Delete Receipt
+            </button>
+            <div class="flex gap-3">
+                <a id="receiptDownloadFile" href="#" download class="px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700">
+                    Download
+                </a>
+                <a id="receiptOpenTab" href="#" target="_blank" class="px-4 py-2 text-malta-blue bg-blue-100 rounded-lg hover:bg-blue-200">
+                    Open in New Tab
+                </a>
+                <button onclick="hideReceiptModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+let currentReceiptInvoiceId = null;
+
+// Selection functions
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.invoice-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
+    const count = checkboxes.length;
+    document.getElementById('selectedCount').textContent = count;
+
+    const bulkApproveBtn = document.getElementById('bulkApproveBtn');
+    const bulkUnapproveBtn = document.getElementById('bulkUnapproveBtn');
+    const exportSelectedBtn = document.getElementById('exportSelectedBtn');
+
+    bulkApproveBtn.disabled = count === 0;
+    bulkUnapproveBtn.disabled = count === 0;
+    exportSelectedBtn.disabled = count === 0;
+}
+
+function getSelectedIds() {
+    const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
+    return Array.from(checkboxes).map(cb => parseInt(cb.value));
+}
+
+function getPendingSelectedIds() {
+    const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
+    return Array.from(checkboxes)
+        .filter(cb => cb.closest('tr').dataset.isPending === 'true')
+        .map(cb => parseInt(cb.value));
+}
+
+function getApprovedSelectedIds() {
+    const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
+    return Array.from(checkboxes)
+        .filter(cb => cb.closest('tr').dataset.isPending === 'false')
+        .map(cb => parseInt(cb.value));
+}
+
+// Bulk approve
+async function bulkApprove() {
+    const ids = getPendingSelectedIds();
+    if (ids.length === 0) {
+        alert('No non-approved invoices selected');
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to approve ${ids.length} invoice(s)?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/invoices/bulk-approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invoice_ids: ids })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert(data.message);
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error approving invoices: ' + error.message);
+    }
+}
+
+// Bulk unapprove
+async function bulkUnapprove() {
+    const ids = getApprovedSelectedIds();
+    if (ids.length === 0) {
+        alert('No approved invoices selected');
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to unapprove ${ids.length} invoice(s)?\n\nThis will:\n- Change status to "Not Approved"\n- KEEP TF numbers (no gaps)\n- Allow editing and re-approval`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/invoices/bulk-unapprove', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invoice_ids: ids })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert(data.message);
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error unapproving invoices: ' + error.message);
+    }
+}
+
+// Export dropdowns
+function toggleExportSelectedDropdown() {
+    document.getElementById('exportSelectedMenu').classList.toggle('hidden');
+    document.getElementById('exportAllMenu').classList.add('hidden');
+}
+
+function toggleExportAllDropdown() {
+    document.getElementById('exportAllMenu').classList.toggle('hidden');
+    document.getElementById('exportSelectedMenu').classList.add('hidden');
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#exportSelectedDropdown')) {
+        document.getElementById('exportSelectedMenu').classList.add('hidden');
+    }
+    if (!e.target.closest('#exportAllDropdown')) {
+        document.getElementById('exportAllMenu').classList.add('hidden');
+    }
+});
+
+// Export selected
+async function exportSelected(format) {
+    const ids = getSelectedIds();
+    if (ids.length === 0) {
+        alert('No invoices selected');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/export/selected/${format}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invoice_ids: ids })
+        });
+
+        // Check content type to determine how to handle response
+        const contentType = response.headers.get('content-type') || '';
+
+        if (!response.ok) {
+            if (contentType.includes('application/json')) {
+                const error = await response.json();
+                alert('Error: ' + (error.error || 'Export failed'));
+            } else {
+                alert('Error: Export failed with status ' + response.status);
+            }
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+
+        // Get filename from header or use default
+        const disposition = response.headers.get('Content-Disposition');
+        let filename = `export.${format === 'excel' ? 'xlsx' : format}`;
+        if (disposition && disposition.includes('filename=')) {
+            filename = disposition.split('filename=')[1].replace(/"/g, '');
+        }
+
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+    } catch (error) {
+        alert('Error exporting: ' + error.message);
+    }
+
+    document.getElementById('exportSelectedMenu').classList.add('hidden');
+}
+
+// Approve modal functions
 function showApproveModal(id, supplier, invoiceNum) {
     document.getElementById('approveSupplier').textContent = supplier;
     document.getElementById('approveInvoiceNum').textContent = invoiceNum;
@@ -252,6 +616,7 @@ function hideApproveModal() {
     document.getElementById('approveModal').classList.remove('flex');
 }
 
+// Delete modal functions
 function showDeleteModal(id, supplier, invoiceNum) {
     document.getElementById('deleteSupplier').textContent = supplier;
     document.getElementById('deleteInvoiceNum').textContent = invoiceNum;
@@ -265,20 +630,156 @@ function hideDeleteModal() {
     document.getElementById('deleteModal').classList.remove('flex');
 }
 
+// Upload modal functions
+function showUploadModal(id, pjv) {
+    document.getElementById('uploadPjv').textContent = pjv;
+    document.getElementById('uploadInvoiceId').value = id;
+    document.getElementById('uploadModal').classList.remove('hidden');
+    document.getElementById('uploadModal').classList.add('flex');
+}
+
+function hideUploadModal() {
+    document.getElementById('uploadModal').classList.add('hidden');
+    document.getElementById('uploadModal').classList.remove('flex');
+    document.getElementById('uploadForm').reset();
+}
+
+// Receipt view modal
+function showReceiptModal(id, pjv) {
+    currentReceiptInvoiceId = id;
+    document.getElementById('receiptPjv').textContent = pjv;
+    document.getElementById('receiptFrame').src = '/invoices/' + id + '/fiscal-receipt';
+    document.getElementById('receiptDownloadFile').href = '/invoices/' + id + '/fiscal-receipt?download=true';
+    document.getElementById('receiptOpenTab').href = '/invoices/' + id + '/fiscal-receipt';
+    document.getElementById('receiptModal').classList.remove('hidden');
+    document.getElementById('receiptModal').classList.add('flex');
+}
+
+function hideReceiptModal() {
+    document.getElementById('receiptModal').classList.add('hidden');
+    document.getElementById('receiptModal').classList.remove('flex');
+    document.getElementById('receiptFrame').src = '';
+    currentReceiptInvoiceId = null;
+}
+
+async function deleteReceipt() {
+    if (!currentReceiptInvoiceId) return;
+
+    if (!confirm('Are you sure you want to delete this fiscal receipt?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/invoices/' + currentReceiptInvoiceId + '/fiscal-receipt', {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert('Receipt deleted successfully');
+            hideReceiptModal();
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('Error deleting receipt: ' + error.message);
+    }
+}
+
+// Upload form handler
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const invoiceId = document.getElementById('uploadInvoiceId').value;
+    const formData = new FormData(this);
+
+    try {
+        const response = await fetch('/invoices/' + invoiceId + '/fiscal-receipt', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert('Receipt uploaded successfully');
+            hideUploadModal();
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('Error uploading receipt: ' + error.message);
+    }
+});
+
 // Close modals on escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         hideApproveModal();
         hideDeleteModal();
+        hideUploadModal();
+        hideReceiptModal();
     }
 });
 
 // Close modals on backdrop click
-document.getElementById('approveModal').addEventListener('click', function(e) {
-    if (e.target === this) hideApproveModal();
+['approveModal', 'deleteModal', 'uploadModal', 'receiptModal'].forEach(modalId => {
+    document.getElementById(modalId).addEventListener('click', function(e) {
+        if (e.target === this) {
+            if (modalId === 'approveModal') hideApproveModal();
+            else if (modalId === 'deleteModal') hideDeleteModal();
+            else if (modalId === 'uploadModal') hideUploadModal();
+            else if (modalId === 'receiptModal') hideReceiptModal();
+        }
+    });
 });
-document.getElementById('deleteModal').addEventListener('click', function(e) {
-    if (e.target === this) hideDeleteModal();
+
+// Supplier filter dropdown functions
+function toggleSupplierDropdown() {
+    const dropdown = document.getElementById('supplierFilterDropdown');
+    const searchInput = document.getElementById('supplierFilterSearch');
+
+    dropdown.classList.toggle('hidden');
+
+    if (!dropdown.classList.contains('hidden')) {
+        searchInput.value = '';
+        filterSupplierOptions();
+        searchInput.focus();
+    }
+}
+
+function selectSupplierFilter(id, name) {
+    document.getElementById('supplierFilterValue').value = id;
+    document.getElementById('supplierFilterDisplay').textContent = name;
+    document.getElementById('supplierFilterDropdown').classList.add('hidden');
+}
+
+function filterSupplierOptions() {
+    const searchInput = document.getElementById('supplierFilterSearch');
+    const filter = searchInput.value.toLowerCase();
+    const options = document.querySelectorAll('.supplier-option');
+
+    options.forEach(option => {
+        const text = option.textContent.toLowerCase();
+        if (text.includes(filter)) {
+            option.style.display = '';
+        } else {
+            option.style.display = 'none';
+        }
+    });
+}
+
+// Close supplier dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('supplierFilterDropdown');
+    const button = document.getElementById('supplierFilterBtn');
+
+    if (dropdown && button && !dropdown.contains(e.target) && !button.contains(e.target)) {
+        dropdown.classList.add('hidden');
+    }
 });
 </script>
 {% endblock %}

@@ -14,7 +14,7 @@
             <p class="text-2xl font-bold text-gray-800">{{ stats.total_invoices }}</p>
         </div>
         <div class="bg-white rounded-lg shadow p-4">
-            <p class="text-sm text-gray-500">Pending</p>
+            <p class="text-sm text-gray-500">Not Approved</p>
             <p class="text-2xl font-bold text-amber-600">{{ stats.pending_invoices }}</p>
         </div>
         <div class="bg-white rounded-lg shadow p-4">
@@ -69,208 +69,17 @@
         </div>
     </div>
 
-    <!-- Suppliers Section -->
+    <!-- Quick Link to Suppliers -->
     <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-medium text-gray-900">Suppliers</h3>
-            <button onclick="showAddSupplierModal()" class="px-4 py-2 bg-malta-blue text-white rounded-lg hover:bg-malta-blue-dark transition text-sm">
-                + Add Supplier
-            </button>
-        </div>
-
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Invoices</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% for supplier, invoice_count in suppliers %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm text-gray-900">{{ supplier.name }}</td>
-                        <td class="px-4 py-3 text-sm text-center text-gray-500">{{ invoice_count }}</td>
-                        <td class="px-4 py-3 text-right">
-                            <div class="flex justify-end gap-2">
-                                <button onclick="showEditSupplierModal({{ supplier.id }}, '{{ supplier.name }}')" class="text-malta-blue hover:text-malta-blue-dark" title="Edit">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                    </svg>
-                                </button>
-                                {% if invoice_count == 0 %}
-                                <form method="POST" action="/settings/suppliers/{{ supplier.id }}/delete" class="inline" onsubmit="return confirm('Are you sure you want to delete this supplier?')">
-                                    <button type="submit" class="text-red-600 hover:text-red-800" title="Delete">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
-                                    </button>
-                                </form>
-                                {% else %}
-                                <button onclick="showMergeSupplierModal({{ supplier.id }}, '{{ supplier.name }}')" class="text-amber-600 hover:text-amber-800" title="Merge with another supplier">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-                                    </svg>
-                                </button>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="3" class="px-4 py-8 text-center text-gray-500">
-                            No suppliers found.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-medium text-gray-900">Suppliers</h3>
+                <p class="text-sm text-gray-500 mt-1">Manage your supplier directory</p>
+            </div>
+            <a href="/suppliers" class="px-4 py-2 bg-malta-blue text-white rounded-lg hover:bg-malta-blue-dark transition">
+                Manage Suppliers
+            </a>
         </div>
     </div>
 </div>
-
-<!-- Add Supplier Modal -->
-<div id="addSupplierModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-        <h3 class="text-lg font-bold text-gray-900 mb-4">Add New Supplier</h3>
-        <form method="POST" action="/settings/suppliers/add">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
-                <input type="text" name="name" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
-            </div>
-            <div class="mt-6 flex justify-end gap-3">
-                <button type="button" onclick="hideAddSupplierModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
-                    Cancel
-                </button>
-                <button type="submit" class="px-4 py-2 text-white bg-malta-blue rounded-lg hover:bg-malta-blue-dark">
-                    Add
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Edit Supplier Modal -->
-<div id="editSupplierModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-        <h3 class="text-lg font-bold text-gray-900 mb-4">Edit Supplier</h3>
-        <form id="editSupplierForm" method="POST">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
-                <input type="text" name="name" id="editSupplierName" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
-            </div>
-            <div class="mt-6 flex justify-end gap-3">
-                <button type="button" onclick="hideEditSupplierModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
-                    Cancel
-                </button>
-                <button type="submit" class="px-4 py-2 text-white bg-malta-blue rounded-lg hover:bg-malta-blue-dark">
-                    Update
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Merge Supplier Modal -->
-<div id="mergeSupplierModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-        <h3 class="text-lg font-bold text-gray-900 mb-4">Merge Suppliers</h3>
-        <p class="text-gray-600 mb-4">
-            Merge <strong id="mergeSourceName"></strong> with another supplier. All invoices will be transferred.
-        </p>
-        <form id="mergeSupplierForm" method="POST" action="/settings/suppliers/merge">
-            <input type="hidden" name="source_id" id="mergeSourceId">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Merge with</label>
-                <select name="target_id" id="mergeTargetSelect" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
-                    <option value="">-- Select Supplier --</option>
-                    {% for supplier, _ in suppliers %}
-                    <option value="{{ supplier.id }}">{{ supplier.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <p class="text-sm text-amber-600 mt-2">
-                Warning: The original supplier will be deleted after merge.
-            </p>
-            <div class="mt-6 flex justify-end gap-3">
-                <button type="button" onclick="hideMergeSupplierModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
-                    Cancel
-                </button>
-                <button type="submit" class="px-4 py-2 text-white bg-amber-600 rounded-lg hover:bg-amber-700">
-                    Merge
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-function showAddSupplierModal() {
-    document.getElementById('addSupplierModal').classList.remove('hidden');
-    document.getElementById('addSupplierModal').classList.add('flex');
-}
-
-function hideAddSupplierModal() {
-    document.getElementById('addSupplierModal').classList.add('hidden');
-    document.getElementById('addSupplierModal').classList.remove('flex');
-}
-
-function showEditSupplierModal(id, name) {
-    document.getElementById('editSupplierName').value = name;
-    document.getElementById('editSupplierForm').action = '/settings/suppliers/' + id + '/edit';
-    document.getElementById('editSupplierModal').classList.remove('hidden');
-    document.getElementById('editSupplierModal').classList.add('flex');
-}
-
-function hideEditSupplierModal() {
-    document.getElementById('editSupplierModal').classList.add('hidden');
-    document.getElementById('editSupplierModal').classList.remove('flex');
-}
-
-function showMergeSupplierModal(id, name) {
-    document.getElementById('mergeSourceId').value = id;
-    document.getElementById('mergeSourceName').textContent = name;
-
-    // Remove source from target options
-    const select = document.getElementById('mergeTargetSelect');
-    for (let i = 0; i < select.options.length; i++) {
-        if (select.options[i].value == id) {
-            select.options[i].disabled = true;
-        } else {
-            select.options[i].disabled = false;
-        }
-    }
-    select.value = '';
-
-    document.getElementById('mergeSupplierModal').classList.remove('hidden');
-    document.getElementById('mergeSupplierModal').classList.add('flex');
-}
-
-function hideMergeSupplierModal() {
-    document.getElementById('mergeSupplierModal').classList.add('hidden');
-    document.getElementById('mergeSupplierModal').classList.remove('flex');
-}
-
-// Close modals on escape key
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        hideAddSupplierModal();
-        hideEditSupplierModal();
-        hideMergeSupplierModal();
-    }
-});
-
-// Close modals on backdrop click
-['addSupplierModal', 'editSupplierModal', 'mergeSupplierModal'].forEach(function(modalId) {
-    document.getElementById(modalId).addEventListener('click', function(e) {
-        if (e.target === this) {
-            this.classList.add('hidden');
-            this.classList.remove('flex');
-        }
-    });
-});
-</script>
 {% endblock %}

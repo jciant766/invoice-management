@@ -33,11 +33,23 @@ async def email_inbox(request: Request, db: Session = Depends(get_db)):
     # Check service status
     email_status = "Not connected"
     ai_status = "Checking..."
+    authenticated_email = None
+    active_provider = None
+    oauth_configured = {"google": False, "microsoft": False}
+
+    try:
+        # Get OAuth configuration status
+        from services.oauth_service import is_oauth_configured
+        oauth_configured = is_oauth_configured()
+    except ImportError:
+        pass
 
     try:
         email_service = get_email_service()
         if email_service.is_available():
             email_status = f"Connected ({email_service.get_service_type()})"
+            authenticated_email = email_service.get_authenticated_email()
+            active_provider = email_service.get_active_provider()
     except Exception as e:
         email_status = f"Error: {str(e)}"
 
@@ -50,7 +62,10 @@ async def email_inbox(request: Request, db: Session = Depends(get_db)):
             "method_request_codes": METHOD_REQUEST_CODES,
             "method_procurement_codes": METHOD_PROCUREMENT_CODES,
             "emails": [],
-            "parsed_invoice": None
+            "parsed_invoice": None,
+            "authenticated_email": authenticated_email,
+            "active_provider": active_provider,
+            "oauth_configured": oauth_configured
         }
     )
 
@@ -192,17 +207,23 @@ async def parse_email(email_id: str, include_thread: bool = True):
                 email_content = combined_content
 
         # Check if email has content
-        if not email_content:
+        if not email_content and not email_data.get("attachments"):
             return JSONResponse(
                 status_code=422,
-                content={"error": "Email has no readable content. Try a different email."}
+                content={"error": "Email has no readable content or attachments. Try a different email."}
             )
 
-        # Parse with AI
+        # Get attachments if any
+        attachments = email_data.get("attachments", [])
+        if attachments:
+            print(f"Email has {len(attachments)} attachment(s)")
+
+        # Parse with AI (including attachments)
         parsed = await parse_invoice_email(
-            email_content=email_content,
+            email_content=email_content or "(No email body text - see attachments)",
             email_subject=email_data["subject"],
-            email_from=email_data["from"]
+            email_from=email_data["from"],
+            attachments=attachments
         )
 
         if not parsed:
@@ -228,25 +249,88 @@ async def parse_email(email_id: str, include_thread: bool = True):
 
         # Friendly error messages for AI service errors
         if "AI_PARSE_ERROR" in error_str:
-            # AI returned malformed JSON - this is the error we saw in your logs!
+            # AI returned malformed JSON
             return ai_parsing_error(original_error=error_str)
+        elif "MODEL_NOT_SUPPORTED" in error_str:
+            # Gemini thinking_budget error - return proper error format
+            print(f"Parse error: {e}")
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "error": {
+                        "type": "model_error",
+                        "message": "The AI model you're using is incompatible",
+                        "details": {"original_error": error_str},
+                        "user_action": "You're using a Google Gemini model which doesn't work with this system. Please change your OpenRouter model to:\n• Claude (anthropic/claude-3.5-sonnet) - Recommended\n• GPT-4 (openai/gpt-4-turbo)\n\nUpdate the OPENROUTER_MODEL in your .env file."
+                    }
+                }
+            )
         elif "OUT_OF_CREDITS" in error_str:
-            friendly_error = "AI service out of credits. Please add credits at openrouter.ai/settings/credits"
+            print(f"Parse error: {e}")
+            return JSONResponse(
+                status_code=402,
+                content={
+                    "error": {
+                        "type": "credits_error",
+                        "message": "AI service is out of credits",
+                        "details": {},
+                        "user_action": "Add more credits at openrouter.ai/settings/credits"
+                    }
+                }
+            )
         elif "INVALID_API_KEY" in error_str:
-            friendly_error = "Invalid AI API key. Please check your OpenRouter API key in .env file."
+            print(f"Parse error: {e}")
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "error": {
+                        "type": "api_key_error",
+                        "message": "Invalid OpenRouter API key",
+                        "details": {},
+                        "user_action": "Check that OPENROUTER_API_KEY in your .env file is correct. Get your API key from openrouter.ai/settings/keys"
+                    }
+                }
+            )
         elif "RATE_LIMITED" in error_str:
-            friendly_error = "Too many AI requests. Please wait a moment and try again."
+            print(f"Parse error: {e}")
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": {
+                        "type": "rate_limit_error",
+                        "message": "Too many AI requests",
+                        "details": {},
+                        "user_action": "Please wait a moment and try again. OpenRouter has rate limits on API calls."
+                    }
+                }
+            )
         elif "timeout" in error_str.lower():
-            friendly_error = "AI request timed out. Please try again."
+            print(f"Parse error: {e}")
+            return JSONResponse(
+                status_code=504,
+                content={
+                    "error": {
+                        "type": "timeout_error",
+                        "message": "AI request timed out",
+                        "details": {},
+                        "user_action": "The AI service took too long to respond. Please try again."
+                    }
+                }
+            )
         else:
-            friendly_error = "Something went wrong while parsing the email. Please try again."
-
-        print(f"Parse error: {e}")
-
-        return JSONResponse(
-            status_code=500,
-            content={"error": friendly_error}
-        )
+            # Generic error
+            print(f"Parse error: {e}")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": {
+                        "type": "parse_error",
+                        "message": "Unable to parse email",
+                        "details": {"original_error": str(e)},
+                        "user_action": "Something went wrong while parsing the email. Please try a different email or check your AI service configuration."
+                    }
+                }
+            )
 
 
 @router.post("/parse-multiple", response_class=JSONResponse)
@@ -298,11 +382,15 @@ async def parse_multiple_emails(request: Request):
                             combined_content += f"{msg['body']}\n\n---\n\n"
                         email_content = combined_content
 
-                # Parse with AI
+                # Get attachments if any
+                attachments = email_data.get("attachments", [])
+
+                # Parse with AI (including attachments)
                 parsed = await parse_invoice_email(
-                    email_content=email_content,
+                    email_content=email_content or "(No email body text - see attachments)",
                     email_subject=email_data["subject"],
-                    email_from=email_data["from"]
+                    email_from=email_data["from"],
+                    attachments=attachments
                 )
 
                 if parsed:

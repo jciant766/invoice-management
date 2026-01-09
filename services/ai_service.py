@@ -1,15 +1,16 @@
 """
-AI Service for parsing invoice emails using OpenRouter/Gemini.
+AI Service for parsing invoice emails using OpenRouter/GPT-5.2 with vision support.
 
-Extracts structured invoice data from email conversations.
+Extracts structured invoice data from email conversations and attachments.
 """
 
 import os
 import json
 import httpx
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from dotenv import load_dotenv
+from .attachment_utils import prepare_attachments_for_vision
 
 load_dotenv()
 
@@ -19,9 +20,14 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 # System prompt for invoice extraction
-INVOICE_EXTRACTION_PROMPT = """You are an AI assistant specialized in extracting invoice information from email conversations for a local council in Malta.
+INVOICE_EXTRACTION_PROMPT = """You are an invoice extraction agent specialized in extracting invoice information from emails and attachments for a local council in Malta.
 
-Your task is to analyze the email conversation and extract invoice/payment details. The council uses specific codes for categorization.
+Your task is to analyze:
+1. The email body text
+2. Any PDF or image attachments provided (which may contain the actual invoice)
+3. Previous email threads in the conversation
+
+Extract invoice/payment details from all available sources. The council uses specific codes for categorization.
 
 METHOD REQUEST CODES:
 - P: Part Payment
@@ -67,14 +73,15 @@ IMPORTANT RULES:
 Return ONLY the JSON object, no additional text or markdown formatting."""
 
 
-async def parse_invoice_email(email_content: str, email_subject: str = "", email_from: str = "") -> Optional[Dict[str, Any]]:
+async def parse_invoice_email(email_content: str, email_subject: str = "", email_from: str = "", attachments: List[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """
-    Parse an email to extract invoice information using AI.
+    Parse an email to extract invoice information using AI with vision support.
 
     Args:
         email_content: The full email body/conversation
         email_subject: Email subject line
         email_from: Sender information
+        attachments: List of attachment dictionaries with 'data', 'mime_type', 'filename'
 
     Returns:
         Dictionary with extracted invoice data or None if parsing fails
@@ -83,8 +90,41 @@ async def parse_invoice_email(email_content: str, email_subject: str = "", email
         print("OpenRouter API key not configured")
         return None
 
-    # Construct the message with context
-    user_message = f"""Please extract invoice information from this email:
+    # Process attachments for vision API
+    processed_attachments = []
+    if attachments:
+        processed_attachments = prepare_attachments_for_vision(attachments)
+        print(f"Processed {len(processed_attachments)} attachment(s) for vision API")
+
+    # Build user message content
+    if processed_attachments:
+        # Vision API format with images
+        user_content = [
+            {
+                "type": "text",
+                "text": f"""Please extract invoice information from this email and the attached images:
+
+SUBJECT: {email_subject}
+FROM: {email_from}
+
+EMAIL CONTENT:
+{email_content}
+
+The attached images may contain the invoice. Analyze both the email text and images to extract invoice details. Return as JSON."""
+            }
+        ]
+
+        # Add images
+        for attachment in processed_attachments:
+            user_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{attachment['mime_type']};base64,{attachment['base64']}"
+                }
+            })
+    else:
+        # Text-only format
+        user_content = f"""Please extract invoice information from this email:
 
 SUBJECT: {email_subject}
 FROM: {email_from}
@@ -108,7 +148,7 @@ Extract the invoice details and return as JSON."""
                     "model": OPENROUTER_MODEL,
                     "messages": [
                         {"role": "system", "content": INVOICE_EXTRACTION_PROMPT},
-                        {"role": "user", "content": user_message}
+                        {"role": "user", "content": user_content}
                     ],
                     "temperature": 0.1,  # Low temperature for consistent extraction
                     "max_tokens": 1000
@@ -124,6 +164,9 @@ Extract the invoice details and return as JSON."""
                     raise Exception("INVALID_API_KEY")
                 elif response.status_code == 429:
                     raise Exception("RATE_LIMITED")
+                elif "thinking_budget" in error_text:
+                    # Google Gemini models don't support thinking_budget parameter
+                    raise Exception("MODEL_NOT_SUPPORTED: Try using a different model like Claude or GPT")
                 return None
 
             result = response.json()
@@ -156,13 +199,17 @@ Extract the invoice details and return as JSON."""
 
     except json.JSONDecodeError as e:
         print(f"Failed to parse AI response as JSON: {e}")
-        return None
+        raise Exception(f"AI_PARSE_ERROR: {str(e)}")
     except httpx.TimeoutException:
         print("OpenRouter API request timed out")
-        return None
+        raise Exception("TIMEOUT: AI request timed out. Please try again.")
     except Exception as e:
+        # Re-raise exceptions that should be handled by the route
+        error_str = str(e)
+        if any(err in error_str for err in ["AI_PARSE_ERROR", "OUT_OF_CREDITS", "INVALID_API_KEY", "RATE_LIMITED", "MODEL_NOT_SUPPORTED", "TIMEOUT"]):
+            raise  # Let the route handle these specific errors
         print(f"Error calling OpenRouter API: {e}")
-        return None
+        raise Exception(f"AI_SERVICE_ERROR: {str(e)}")
 
 
 def normalize_invoice_data(data: Dict[str, Any]) -> Dict[str, Any]:

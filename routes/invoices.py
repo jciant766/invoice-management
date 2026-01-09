@@ -7,11 +7,15 @@ Handles all invoice operations including:
 - Filtering and sorting
 """
 
+import os
+import uuid
+import aiofiles
+from pathlib import Path
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Query
-from fastapi.responses import HTMLResponse, RedirectResponse
+from typing import Optional, List
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Query, UploadFile, File
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc
@@ -20,8 +24,20 @@ from database import get_db
 from models import Invoice, Supplier, METHOD_REQUEST_CODES, METHOD_PROCUREMENT_CODES
 from services.tf_service import generate_next_tf_number, get_next_tf_number_preview
 
+# Upload configuration
+UPLOAD_FOLDER = Path("uploads/fiscal_receipts")
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 templates = Jinja2Templates(directory="templates")
+
+# Whitelist of allowed sort columns (security - prevent accessing arbitrary attributes)
+ALLOWED_SORT_COLUMNS = {
+    'created_at', 'invoice_date', 'invoice_amount', 'payment_amount',
+    'supplier_id', 'pjv_number', 'invoice_number', 'tf_number', 'is_approved'
+}
 
 
 @router.get("", response_class=HTMLResponse)
@@ -61,8 +77,12 @@ async def list_invoices(
         except ValueError:
             pass
 
-    # Apply sorting
+    # Apply sorting (with security whitelist)
+    if sort_by not in ALLOWED_SORT_COLUMNS:
+        sort_by = 'created_at'  # Default to safe value
     sort_column = getattr(Invoice, sort_by, Invoice.created_at)
+    if sort_order not in ('asc', 'desc'):
+        sort_order = 'desc'  # Default to safe value
     if sort_order == "asc":
         query = query.order_by(asc(sort_column))
     else:
@@ -413,13 +433,16 @@ async def update_invoice(
     invoice.po_number = po_number.strip() if po_number else None
     invoice.pjv_number = pjv_number.strip()
 
-    # Handle approval (one-way: can approve but not un-approve)
+    # Handle approval
     if is_approved and not invoice.is_approved:
+        # Approving (or re-approving) an invoice
         invoice.is_approved = True
         invoice.approved_date = date.today()
         invoice.proposer_councillor = proposer_councillor.strip() if proposer_councillor else None
         invoice.seconder_councillor = seconder_councillor.strip() if seconder_councillor else None
-        invoice.tf_number = generate_next_tf_number(db)
+        # Only generate new TF if doesn't have one (re-approval keeps existing TF)
+        if not invoice.tf_number:
+            invoice.tf_number = generate_next_tf_number(db)
     elif invoice.is_approved:
         # Update councillor names if already approved
         if proposer_councillor:
@@ -478,8 +501,287 @@ async def quick_approve_invoice(
     invoice.approved_date = date.today()
     invoice.proposer_councillor = proposer_councillor.strip()
     invoice.seconder_councillor = seconder_councillor.strip()
-    invoice.tf_number = generate_next_tf_number(db)
+    # Only generate new TF if doesn't have one (re-approval keeps existing TF)
+    if not invoice.tf_number:
+        invoice.tf_number = generate_next_tf_number(db)
 
     db.commit()
 
     return RedirectResponse(url="/invoices", status_code=303)
+
+
+@router.post("/{invoice_id}/unapprove")
+async def unapprove_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Unapprove an invoice (reverse approval).
+
+    KEEPS the TF number and councillor names - only changes status.
+    This allows fixing mistakes without losing the TF reference.
+    """
+    invoice = db.query(Invoice).filter(
+        Invoice.id == invoice_id,
+        Invoice.is_deleted == False,
+        Invoice.is_approved == True  # Must be approved to unapprove
+    ).first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found or not approved")
+
+    # Only change approval status - KEEP TF number and councillor names
+    invoice.is_approved = False
+    invoice.approved_date = None
+    # TF number stays - it's a permanent reference ID
+    # Councillor names stay - so user doesn't have to re-enter
+
+    db.commit()
+
+    return RedirectResponse(url=f"/invoices/{invoice_id}/edit", status_code=303)
+
+
+# ============================================
+# FISCAL RECEIPT ENDPOINTS
+# ============================================
+
+@router.post("/{invoice_id}/fiscal-receipt", response_class=JSONResponse)
+async def upload_fiscal_receipt(
+    invoice_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload a fiscal receipt PDF/image for an invoice."""
+    invoice = db.query(Invoice).filter(
+        Invoice.id == invoice_id,
+        Invoice.is_deleted == False
+    ).first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Validate file extension
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"}
+        )
+
+    # Read file content
+    content = await file.read()
+
+    # Validate file size
+    if len(content) > MAX_FILE_SIZE:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB"}
+        )
+
+    # Delete old file if exists
+    if invoice.fiscal_receipt_path:
+        old_path = UPLOAD_FOLDER / invoice.fiscal_receipt_path
+        if old_path.exists():
+            old_path.unlink()
+
+    # Generate unique filename
+    unique_filename = f"{invoice_id}_{uuid.uuid4().hex[:8]}{file_ext}"
+    file_path = UPLOAD_FOLDER / unique_filename
+
+    # Save file
+    async with aiofiles.open(file_path, 'wb') as f:
+        await f.write(content)
+
+    # Update invoice record
+    invoice.fiscal_receipt_path = unique_filename
+    db.commit()
+
+    return {
+        "success": True,
+        "message": "Fiscal receipt uploaded successfully",
+        "filename": unique_filename
+    }
+
+
+@router.get("/{invoice_id}/fiscal-receipt")
+async def get_fiscal_receipt(
+    invoice_id: int,
+    download: bool = Query(False, description="Set to true to download instead of preview"),
+    db: Session = Depends(get_db)
+):
+    """Download/view a fiscal receipt. Use ?download=true to force download."""
+    invoice = db.query(Invoice).filter(
+        Invoice.id == invoice_id,
+        Invoice.is_deleted == False
+    ).first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if not invoice.fiscal_receipt_path:
+        raise HTTPException(status_code=404, detail="No fiscal receipt attached")
+
+    file_path = UPLOAD_FOLDER / invoice.fiscal_receipt_path
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found on server")
+
+    # Determine media type
+    ext = file_path.suffix.lower()
+    media_types = {
+        '.pdf': 'application/pdf',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png'
+    }
+    media_type = media_types.get(ext, 'application/octet-stream')
+
+    from starlette.responses import Response
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    # Use 'attachment' for download, 'inline' for preview
+    disposition = "attachment" if download else "inline"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'{disposition}; filename="fiscal_receipt_{invoice.pjv_number}{ext}"'
+        }
+    )
+
+
+@router.delete("/{invoice_id}/fiscal-receipt", response_class=JSONResponse)
+async def delete_fiscal_receipt(
+    invoice_id: int,
+    db: Session = Depends(get_db)
+):
+    """Delete a fiscal receipt from an invoice."""
+    invoice = db.query(Invoice).filter(
+        Invoice.id == invoice_id,
+        Invoice.is_deleted == False
+    ).first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if not invoice.fiscal_receipt_path:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "No fiscal receipt to delete"}
+        )
+
+    # Delete file
+    file_path = UPLOAD_FOLDER / invoice.fiscal_receipt_path
+    if file_path.exists():
+        file_path.unlink()
+
+    # Update record
+    invoice.fiscal_receipt_path = None
+    db.commit()
+
+    return {
+        "success": True,
+        "message": "Fiscal receipt deleted"
+    }
+
+
+# ============================================
+# BULK OPERATIONS
+# ============================================
+
+@router.post("/bulk-approve", response_class=JSONResponse)
+async def bulk_approve_invoices(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Approve multiple invoices at once (no councillor names required)."""
+    data = await request.json()
+    invoice_ids = data.get("invoice_ids", [])
+
+    if not invoice_ids:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "No invoices selected"}
+        )
+
+    approved_count = 0
+    errors = []
+
+    for inv_id in invoice_ids:
+        invoice = db.query(Invoice).filter(
+            Invoice.id == inv_id,
+            Invoice.is_deleted == False,
+            Invoice.is_approved == False
+        ).first()
+
+        if not invoice:
+            errors.append(f"Invoice {inv_id} not found or already approved")
+            continue
+
+        invoice.is_approved = True
+        invoice.approved_date = date.today()
+        # Only generate new TF if doesn't have one (re-approval keeps existing TF)
+        if not invoice.tf_number:
+            invoice.tf_number = generate_next_tf_number(db)
+        approved_count += 1
+
+    db.commit()
+
+    return {
+        "success": True,
+        "approved_count": approved_count,
+        "errors": errors if errors else None,
+        "message": f"Successfully approved {approved_count} invoice(s)"
+    }
+
+
+@router.post("/bulk-unapprove", response_class=JSONResponse)
+async def bulk_unapprove_invoices(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Unapprove multiple invoices at once.
+
+    KEEPS TF numbers and councillor names - only changes status.
+    """
+    data = await request.json()
+    invoice_ids = data.get("invoice_ids", [])
+
+    if not invoice_ids:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "No invoices selected"}
+        )
+
+    unapproved_count = 0
+    errors = []
+
+    for inv_id in invoice_ids:
+        invoice = db.query(Invoice).filter(
+            Invoice.id == inv_id,
+            Invoice.is_deleted == False,
+            Invoice.is_approved == True  # Must be approved to unapprove
+        ).first()
+
+        if not invoice:
+            errors.append(f"Invoice {inv_id} not found or not approved")
+            continue
+
+        # Only change status - KEEP TF number and councillor names
+        invoice.is_approved = False
+        invoice.approved_date = None
+        # TF number stays - permanent reference ID
+        # Councillor names stay
+        unapproved_count += 1
+
+    db.commit()
+
+    return {
+        "success": True,
+        "unapproved_count": unapproved_count,
+        "errors": errors if errors else None,
+        "message": f"Successfully unapproved {unapproved_count} invoice(s)"
+    }
