@@ -1,0 +1,29 @@
+[Unit]
+Description=Invoice Management System
+After=network.target
+
+[Service]
+Type=simple
+User=invoiceapp
+Group=invoiceapp
+WorkingDirectory=/opt/invoice_management
+Environment="PATH=/opt/invoice_management/venv/bin"
+EnvironmentFile=/opt/invoice_management/.env
+ExecStart=/opt/invoice_management/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/invoice_management
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=invoice_management
+
+[Install]
+WantedBy=multi-user.target

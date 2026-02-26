@@ -7,10 +7,13 @@ Priority order:
 3. IMAP with username/password
 """
 
+import logging
 import os
 from typing import Optional, List, Dict, Any
 from .gmail_service import get_gmail_service, get_gmail_service_oauth, reset_gmail_service
 from .imap_service import get_imap_service
+
+logger = logging.getLogger(__name__)
 
 
 class UnifiedEmailService:
@@ -53,9 +56,9 @@ class UnifiedEmailService:
                     return
 
         except ImportError as e:
-            print(f"OAuth services not available: {e}")
+            logger.warning(f"OAuth services not available: {e}")
         except Exception as e:
-            print(f"OAuth initialization error: {e}")
+            logger.error(f"OAuth initialization error: {e}")
 
         # 2. Try legacy file-based Gmail API
         gmail_service = get_gmail_service()
@@ -64,7 +67,7 @@ class UnifiedEmailService:
             self.service_type = "Gmail API"
             try:
                 self._authenticated_email = gmail_service.get_authenticated_email()
-            except:
+            except Exception:
                 pass
             return
 
@@ -95,7 +98,7 @@ class UnifiedEmailService:
         try:
             from .oauth_service import OAuthTokenManager
             return OAuthTokenManager.get_active_provider()
-        except:
+        except Exception:
             return None
 
     def get_unread_emails(self, max_results: int = 500) -> List[Dict[str, Any]]:
@@ -193,6 +196,34 @@ class UnifiedEmailService:
         if not self.service:
             return False
         return self.service.mark_as_read(email_id)
+
+    def list_folders(self) -> List[Dict[str, Any]]:
+        """List all available folders/labels."""
+        if not self.service:
+            return []
+
+        if self.service_type in ["Gmail API", "Google"]:
+            if hasattr(self.service, 'list_labels'):
+                return self.service.list_labels()
+        elif self.service_type == "Microsoft":
+            if hasattr(self.service, 'list_folders'):
+                return self.service.list_folders()
+
+        return []
+
+    def get_emails_from_folder(self, folder_id: str, max_results: int = 150) -> List[Dict[str, Any]]:
+        """Fetch emails from a specific folder/label."""
+        if not self.service:
+            return []
+
+        if self.service_type in ["Gmail API", "Google"]:
+            if hasattr(self.service, 'get_emails_from_label'):
+                return self.service.get_emails_from_label(folder_id, max_results)
+        elif self.service_type == "Microsoft":
+            if hasattr(self.service, 'get_emails_from_folder'):
+                return self.service.get_emails_from_folder(folder_id, max_results)
+
+        return []
 
 
 # Singleton instance

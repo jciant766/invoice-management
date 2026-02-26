@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flash_messages, pagination_nav with context %}
+
+{% block title %}User Management - Sliema Local Council{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">User Management</h1>
+        <p class="text-gray-600">Manage system users and permissions</p>
+    </div>
+    <a href="/users/create" class="bg-malta-blue text-white px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        Add User
+    </a>
+</div>
+
+{{ flash_messages() }}
+
+<!-- Users Table -->
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Login</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for user in users %}
+            <tr class="hover:bg-gray-50 {% if not user.is_active %}bg-gray-100 opacity-75{% endif %}">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 rounded-full bg-malta-blue flex items-center justify-center text-white font-medium">
+                            {{ user.username[0].upper() }}
+                        </div>
+                        <div class="ml-3">
+                            <div class="text-sm font-medium text-gray-900">{{ user.username }}</div>
+                            {% if user.full_name %}
+                            <div class="text-sm text-gray-500">{{ user.full_name }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {{ user.email }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% if user.role == 'admin' %}
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        Admin
+                    </span>
+                    {% else %}
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                        User
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% if user.is_active %}
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                        Active
+                    </span>
+                    {% else %}
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                        Inactive
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {% if user.last_login %}
+                    {{ user.last_login|format_date('%d/%m/%Y %H:%M') }}
+                    {% else %}
+                    <span class="text-gray-400">Never</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div class="flex items-center justify-end gap-2">
+                        <a href="/users/{{ user.id }}/edit" class="text-malta-blue hover:text-malta-blue-dark" title="Edit">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                        </a>
+                        <a href="/users/{{ user.id }}/password" class="text-yellow-600 hover:text-yellow-700" title="Change Password">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                            </svg>
+                        </a>
+                        <a href="/users/{{ user.id }}/gdpr-export" class="text-sky-600 hover:text-sky-700" title="GDPR Export">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-8m0 8l-3-3m3 3l3-3M5 20h14"></path>
+                            </svg>
+                        </a>
+                        {% if user.id != current_user.id %}
+                        <form action="/users/{{ user.id }}/toggle-active" method="POST" class="inline">
+                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                            <button type="submit" class="{% if user.is_active %}text-orange-600 hover:text-orange-700{% else %}text-green-600 hover:text-green-700{% endif %}" title="{% if user.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                {% if user.is_active %}
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                                </svg>
+                                {% else %}
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                {% endif %}
+                            </button>
+                        </form>
+                        <form action="/users/{{ user.id }}/delete" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete this user?');">
+                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                            <button type="submit" class="text-red-600 hover:text-red-700" title="Delete">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </form>
+                        <form action="/users/{{ user.id }}/gdpr-delete" method="POST" class="inline" onsubmit="return confirm('This permanently deletes personal data for GDPR request. Continue?');">
+                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                            <button type="submit" class="text-pink-700 hover:text-pink-800" title="GDPR Delete">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M7 8h10M9 4h6m-7 16h8a2 2 0 002-2V8H6v10a2 2 0 002 2z"></path>
+                                </svg>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                    No users found. <a href="/users/create" class="text-malta-blue hover:underline">Create the first user</a>.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {{ pagination_nav(pagination, 'users') }}
+</div>
+{% endblock %}

@@ -5,10 +5,16 @@ Works with Gmail, Outlook, Yahoo, and any IMAP-enabled email provider
 
 import imaplib
 import email
+import logging
 from email.header import decode_header
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import re
+
+logger = logging.getLogger(__name__)
+
+# Maximum attachment size (10MB) - matches Gmail and Outlook limits
+MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
 
 
 class IMAPEmailService:
@@ -38,7 +44,35 @@ class IMAPEmailService:
             self.mail.login(self.email_address, self.password)
             return True
         except Exception as e:
+            # Close any partial connection to prevent leaks
+            if self.mail:
+                try:
+                    self.mail.logout()
+                except Exception:
+                    pass
+                self.mail = None
             raise ConnectionError(f"Failed to connect to {self.imap_server}: {str(e)}")
+
+    def _ensure_connected(self):
+        """Check connection is alive and reconnect if needed."""
+        if self.mail is None:
+            self._connect()
+            return
+
+        try:
+            # NOOP is a lightweight way to check if connection is alive
+            status, _ = self.mail.noop()
+            if status != "OK":
+                raise Exception("Connection check failed")
+        except Exception:
+            # Connection is dead, try to reconnect
+            logger.warning("IMAP connection lost, reconnecting...")
+            try:
+                self.mail.logout()
+            except Exception:
+                pass
+            self.mail = None
+            self._connect()
 
     def _decode_header(self, header_value: str) -> str:
         """Decode email header that might be encoded."""
@@ -73,17 +107,17 @@ class IMAPEmailService:
                     try:
                         body = part.get_payload(decode=True).decode('utf-8', errors='ignore')
                         break  # Prefer plain text
-                    except:
+                    except Exception:
                         pass
                 elif content_type == "text/html" and not body:
                     try:
                         body = part.get_payload(decode=True).decode('utf-8', errors='ignore')
-                    except:
+                    except Exception:
                         pass
         else:
             try:
                 body = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
-            except:
+            except Exception:
                 body = str(msg.get_payload())
 
         return body
@@ -106,6 +140,11 @@ class IMAPEmailService:
                                 # Get attachment data
                                 data = part.get_payload(decode=True)
 
+                                # Check size limit
+                                if len(data) > MAX_ATTACHMENT_SIZE:
+                                    logger.warning(f"Skipping attachment {filename}: too large ({len(data)} bytes, max {MAX_ATTACHMENT_SIZE})")
+                                    continue
+
                                 attachments.append({
                                     'filename': self._decode_header(filename),
                                     'mime_type': content_type,
@@ -113,10 +152,10 @@ class IMAPEmailService:
                                     'size': len(data)
                                 })
 
-                                print(f"Downloaded attachment: {filename} ({content_type}, {len(data)} bytes)")
+                                logger.debug(f"Downloaded attachment: {filename} ({content_type}, {len(data)} bytes)")
 
                             except Exception as e:
-                                print(f"Error extracting attachment {filename}: {e}")
+                                logger.error(f"Error extracting attachment {filename}: {e}")
 
         return attachments
 
@@ -155,6 +194,9 @@ class IMAPEmailService:
             List of email dictionaries
         """
         try:
+            # Ensure connection is alive
+            self._ensure_connected()
+
             # Select folder
             self.mail.select(folder, readonly=True)
 
@@ -183,7 +225,7 @@ class IMAPEmailService:
             return emails
 
         except Exception as e:
-            print(f"Error searching emails: {e}")
+            logger.error(f"Error searching emails: {e}")
             return []
 
     def _fetch_email_by_id(self, email_id: bytes) -> Optional[Dict[str, Any]]:
@@ -229,7 +271,7 @@ class IMAPEmailService:
             }
 
         except Exception as e:
-            print(f"Error fetching email {email_id}: {e}")
+            logger.error(f"Error fetching email {email_id}: {e}")
             return None
 
     def _add_thread_counts(self, emails: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -281,11 +323,12 @@ class IMAPEmailService:
     def mark_as_read(self, email_id: str) -> bool:
         """Mark an email as read."""
         try:
+            self._ensure_connected()
             self.mail.select("INBOX")
             self.mail.store(email_id.encode(), '+FLAGS', '\\Seen')
             return True
         except Exception as e:
-            print(f"Error marking email as read: {e}")
+            logger.error(f"Error marking email as read: {e}")
             return False
 
     def close(self):
@@ -294,7 +337,7 @@ class IMAPEmailService:
             if self.mail:
                 self.mail.close()
                 self.mail.logout()
-        except:
+        except Exception:
             pass
 
 
@@ -352,12 +395,12 @@ def get_imap_service(email_address: str = None, password: str = None,
     imap_port = imap_port or int(os.getenv("IMAP_PORT", 993))
 
     if not all([email_address, password, imap_server]):
-        print("IMAP credentials not configured. Set environment variables: IMAP_EMAIL, IMAP_PASSWORD, IMAP_SERVER")
+        logger.warning("IMAP credentials not configured. Set environment variables: IMAP_EMAIL, IMAP_PASSWORD, IMAP_SERVER")
         return None
 
     try:
         _imap_service_instance = IMAPEmailService(email_address, password, imap_server, imap_port)
         return _imap_service_instance
     except Exception as e:
-        print(f"IMAP service error: {e}")
+        logger.error(f"IMAP service error: {e}")
         return None

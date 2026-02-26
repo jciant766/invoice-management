@@ -10,9 +10,12 @@ Provides:
 
 import os
 import json
+import logging
 import time
 from typing import Optional, Dict, Any
 from cryptography.fernet import Fernet, InvalidToken
+
+logger = logging.getLogger(__name__)
 
 # Google OAuth imports
 from google.oauth2.credentials import Credentials
@@ -22,8 +25,7 @@ from google.auth.transport.requests import Request
 # Microsoft OAuth imports
 import msal
 
-from database import SessionLocal
-from models import Setting
+from database import get_connection
 
 
 # =============================================================================
@@ -31,14 +33,15 @@ from models import Setting
 # =============================================================================
 
 def get_encryption_key() -> bytes:
-    """Get or generate encryption key for token storage."""
+    """Get encryption key for token storage. Raises if not configured."""
     key = os.getenv("OAUTH_ENCRYPTION_KEY")
     if not key:
-        # Generate a key if not set (for development)
-        # In production, this should be set in .env
-        key = Fernet.generate_key().decode()
-        print(f"WARNING: No OAUTH_ENCRYPTION_KEY set. Generated temporary key.")
-        print(f"Add this to your .env file: OAUTH_ENCRYPTION_KEY={key}")
+        # Generate a suggested key for the user
+        suggested = Fernet.generate_key().decode()
+        raise RuntimeError(
+            "OAUTH_ENCRYPTION_KEY not set. OAuth tokens cannot be stored securely.\n"
+            f"Add this to your .env file:\nOAUTH_ENCRYPTION_KEY={suggested}"
+        )
     return key.encode() if isinstance(key, str) else key
 
 
@@ -57,7 +60,10 @@ def decrypt_token(encrypted_data: str) -> Optional[Dict[str, Any]]:
         decrypted = fernet.decrypt(encrypted_data.encode())
         return json.loads(decrypted.decode())
     except (InvalidToken, json.JSONDecodeError) as e:
-        print(f"Error decrypting token: {e}")
+        logger.error(f"Error decrypting token: {e}")
+        return None
+    except RuntimeError:
+        # OAUTH_ENCRYPTION_KEY not set
         return None
 
 
@@ -74,93 +80,93 @@ class OAuthTokenManager:
     @staticmethod
     def save_tokens(provider: str, tokens: Dict[str, Any]) -> bool:
         """Save encrypted tokens to database."""
-        db = SessionLocal()
+        conn = get_connection()
         try:
+            cursor = conn.cursor()
             key = f"{OAuthTokenManager.TOKEN_KEY_PREFIX}{provider}"
             encrypted = encrypt_token(tokens)
 
-            # Upsert the setting
-            setting = db.query(Setting).filter(Setting.key == key).first()
-            if setting:
-                setting.value = encrypted
-            else:
-                setting = Setting(key=key, value=encrypted)
-                db.add(setting)
+            # Upsert the setting using INSERT OR REPLACE (key is PRIMARY KEY)
+            cursor.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                (key, encrypted)
+            )
 
             # Also save the active provider
-            provider_setting = db.query(Setting).filter(
-                Setting.key == OAuthTokenManager.PROVIDER_KEY
-            ).first()
-            if provider_setting:
-                provider_setting.value = provider
-            else:
-                provider_setting = Setting(
-                    key=OAuthTokenManager.PROVIDER_KEY,
-                    value=provider
-                )
-                db.add(provider_setting)
+            cursor.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                (OAuthTokenManager.PROVIDER_KEY, provider)
+            )
 
-            db.commit()
+            conn.commit()
             return True
         except Exception as e:
-            print(f"Error saving tokens: {e}")
-            db.rollback()
+            logger.error(f"Error saving tokens: {e}")
+            conn.rollback()
             return False
         finally:
-            db.close()
+            conn.close()
 
     @staticmethod
     def get_tokens(provider: str) -> Optional[Dict[str, Any]]:
         """Retrieve and decrypt tokens from database."""
-        db = SessionLocal()
+        conn = get_connection()
         try:
+            cursor = conn.cursor()
             key = f"{OAuthTokenManager.TOKEN_KEY_PREFIX}{provider}"
-            setting = db.query(Setting).filter(Setting.key == key).first()
-            if setting:
-                return decrypt_token(setting.value)
+            cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            if row:
+                return decrypt_token(row[0])
             return None
         finally:
-            db.close()
+            conn.close()
 
     @staticmethod
     def delete_tokens(provider: str = None) -> bool:
         """Delete tokens from database. If provider is None, delete all."""
-        db = SessionLocal()
+        conn = get_connection()
         try:
+            cursor = conn.cursor()
             if provider:
                 key = f"{OAuthTokenManager.TOKEN_KEY_PREFIX}{provider}"
-                db.query(Setting).filter(Setting.key == key).delete()
+                cursor.execute("DELETE FROM settings WHERE key = ?", (key,))
             else:
                 # Delete all OAuth tokens
-                db.query(Setting).filter(
-                    Setting.key.like(f"{OAuthTokenManager.TOKEN_KEY_PREFIX}%")
-                ).delete(synchronize_session=False)
+                cursor.execute(
+                    "DELETE FROM settings WHERE key LIKE ?",
+                    (f"{OAuthTokenManager.TOKEN_KEY_PREFIX}%",)
+                )
 
             # Clear active provider
-            db.query(Setting).filter(
-                Setting.key == OAuthTokenManager.PROVIDER_KEY
-            ).delete()
+            cursor.execute(
+                "DELETE FROM settings WHERE key = ?",
+                (OAuthTokenManager.PROVIDER_KEY,)
+            )
 
-            db.commit()
+            conn.commit()
             return True
         except Exception as e:
-            print(f"Error deleting tokens: {e}")
-            db.rollback()
+            logger.error(f"Error deleting tokens: {e}")
+            conn.rollback()
             return False
         finally:
-            db.close()
+            conn.close()
 
     @staticmethod
     def get_active_provider() -> Optional[str]:
         """Get the currently active OAuth provider."""
-        db = SessionLocal()
+        conn = get_connection()
         try:
-            setting = db.query(Setting).filter(
-                Setting.key == OAuthTokenManager.PROVIDER_KEY
-            ).first()
-            return setting.value if setting else None
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT value FROM settings WHERE key = ?",
+                (OAuthTokenManager.PROVIDER_KEY,)
+            )
+            row = cursor.fetchone()
+            return row[0] if row else None
         finally:
-            db.close()
+            conn.close()
 
     @staticmethod
     def is_authenticated(provider: str = None) -> bool:
@@ -223,7 +229,7 @@ class GoogleOAuthService:
         authorization_url, _ = flow.authorization_url(
             access_type='offline',
             include_granted_scopes='true',
-            prompt='consent',
+            prompt='select_account',  # Force account picker - don't auto-select
             state=state
         )
 
@@ -286,7 +292,7 @@ class GoogleOAuthService:
                 return {"success": False, "error": "Failed to save tokens"}
 
         except Exception as e:
-            print(f"Google OAuth callback error: {e}")
+            logger.error(f"Google OAuth callback error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -332,7 +338,7 @@ class GoogleOAuthService:
             return credentials
 
         except Exception as e:
-            print(f"Error getting Google credentials: {e}")
+            logger.error(f"Error getting Google credentials: {e}")
             return None
 
     @staticmethod
@@ -395,7 +401,8 @@ class MicrosoftOAuthService:
         auth_url = app.get_authorization_request_url(
             scopes=self.SCOPES,
             redirect_uri=self.redirect_uri,
-            state=state
+            state=state,
+            prompt="select_account"  # Force account picker - don't auto-select
         )
 
         return auth_url
@@ -412,7 +419,6 @@ class MicrosoftOAuthService:
             return {"success": False, "error": "Microsoft OAuth not configured"}
 
         try:
-            # Exchange code for tokens
             result = app.acquire_token_by_authorization_code(
                 code=code,
                 scopes=self.SCOPES,
@@ -430,7 +436,8 @@ class MicrosoftOAuthService:
             headers = {"Authorization": f"Bearer {result['access_token']}"}
             user_response = requests.get(
                 "https://graph.microsoft.com/v1.0/me",
-                headers=headers
+                headers=headers,
+                timeout=30
             )
             user_data = user_response.json()
             email = user_data.get("mail") or user_data.get("userPrincipalName", "Unknown")
@@ -453,7 +460,6 @@ class MicrosoftOAuthService:
                 return {"success": False, "error": "Failed to save tokens"}
 
         except Exception as e:
-            print(f"Microsoft OAuth callback error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -483,7 +489,7 @@ class MicrosoftOAuthService:
                 )
 
                 if "error" in result:
-                    print(f"Token refresh error: {result.get('error_description')}")
+                    logger.error(f"Token refresh error: {result.get('error_description')}")
                     return None
 
                 # Update stored tokens
@@ -495,7 +501,7 @@ class MicrosoftOAuthService:
             return tokens.get('access_token')
 
         except Exception as e:
-            print(f"Error getting Microsoft access token: {e}")
+            logger.error(f"Error getting Microsoft access token: {e}")
             return None
 
     @staticmethod

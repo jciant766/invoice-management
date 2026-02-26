@@ -17,10 +17,18 @@ Common errors we handle:
 - Network: Internet connection issues
 """
 
+import logging
+
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from typing import Dict, Any
 import traceback
+import os
+
+logger = logging.getLogger(__name__)
+
+# Check if running in debug/development mode
+DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
 
 class AppError(Exception):
@@ -199,13 +207,13 @@ async def app_error_handler(request: Request, exc: Exception):
         )
 
     # For any other error, log it and return generic message
-    print(f"❌ UNHANDLED ERROR: {exc}")
-    print(traceback.format_exc())
+    logger.error(f"UNHANDLED ERROR: {exc}")
+    logger.error(traceback.format_exc())
 
     return create_error_response(
         status_code=500,
         error_type="internal_error",
         message="An unexpected error occurred",
-        details={"error": str(exc)} if True else {},  # Set to False in production
+        details={"error": str(exc)} if DEBUG_MODE else {},  # Only show in debug mode
         user_action="Please try again or contact support if the problem persists."
     )

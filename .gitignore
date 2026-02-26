@@ -26,16 +26,24 @@ venv/
 .idea/
 *.db
 *.sqlite
+*.log
 .DS_Store
 .nyc_output/
 coverage/
+.coverage
+.pytest_cache/
 
 # Credentials and tokens (sensitive)
 credentials.json
 token.json
+client_secret_*.json
+ADMIN_CREDENTIALS.txt
 
 # Uploaded files
 uploads/
+
+# Database backups (contain real data)
+backups/
 
 # Local poppler installation (installed via apt in Docker)
 poppler/
@@ -43,3 +51,5 @@ poppler.zip
 
 # Temp files
 nul
+dev_outbox_*.log
+dev_outbox_*.txt

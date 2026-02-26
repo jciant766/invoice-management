@@ -147,6 +147,14 @@ a.bg-gray-600 {
     background: #64748b;
 }
 
+/* Firefox scrollbar styling (prevents dark/black scrollbars in some themes). */
+.overflow-x-auto,
+.overflow-y-auto,
+body {
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #f1f5f9;
+}
+
 /* Toast notification styles */
 .toast {
     position: fixed;

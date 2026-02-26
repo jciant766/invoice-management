@@ -5,12 +5,15 @@
 {% block content %}
 <div class="space-y-6">
     <!-- Page Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
             <h2 class="text-2xl font-bold text-gray-800">Process Emails</h2>
             <p class="text-gray-600 mt-1">Forward invoice emails to create new records</p>
         </div>
-        <a href="/invoices" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
+        <a href="/invoices" class="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 shadow-sm transition">
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7 7-7M3 12h18"></path>
+            </svg>
             Back to Invoices
         </a>
     </div>
@@ -77,77 +80,91 @@
         </div>
     </div>
     {% else %}
-    <!-- Connected Account Card -->
-    <div class="bg-green-50 border border-green-200 rounded-lg shadow p-4">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="p-2 bg-green-100 rounded-lg">
-                    {% if active_provider == 'google' %}
-                    <svg class="w-6 h-6" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    {% elif active_provider == 'microsoft' %}
-                    <svg class="w-6 h-6" viewBox="0 0 23 23">
-                        <path fill="#f35325" d="M1 1h10v10H1z"/>
-                        <path fill="#81bc06" d="M12 1h10v10H12z"/>
-                        <path fill="#05a6f0" d="M1 12h10v10H1z"/>
-                        <path fill="#ffba08" d="M12 12h10v10H12z"/>
-                    </svg>
-                    {% else %}
-                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                    </svg>
-                    {% endif %}
+    <!-- Account / Folder / Status -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="h-10 w-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center">
+                        {% if active_provider == 'google' %}
+                        <svg class="w-6 h-6" viewBox="0 0 24 24" aria-hidden="true">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        {% elif active_provider == 'microsoft' %}
+                        <svg class="w-6 h-6" viewBox="0 0 23 23" aria-hidden="true">
+                            <path fill="#f35325" d="M1 1h10v10H1z"/>
+                            <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                            <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                            <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                        </svg>
+                        {% else %}
+                        <svg class="w-6 h-6 text-malta-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        {% endif %}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-medium text-gray-500">Connected account</p>
+                        <p class="font-semibold text-gray-900 truncate">{{ authenticated_email }}</p>
+                        {% if active_provider %}
+                        <p class="text-xs text-gray-500">Provider: {{ active_provider | title }}</p>
+                        {% endif %}
+                    </div>
                 </div>
-                <div>
-                    <p class="text-sm text-green-600">Connected as</p>
-                    <p class="font-semibold text-green-800">{{ authenticated_email }}</p>
+                <form method="POST" action="/auth/disconnect" style="display:inline;margin:0"
+                      onsubmit="return confirm('Disconnect your email account?')">
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                    <button type="submit"
+                            class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="Disconnect email account">
+                        Disconnect
+                    </button>
+                </form>
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="h-10 w-10 rounded-lg border border-amber-200 bg-amber-50 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-medium text-gray-500">Invoice folder</p>
+                        <p class="font-semibold text-gray-900 truncate" id="selectedFolderName">Loading...</p>
+                        <p class="text-xs text-gray-500">Only this folder is scanned</p>
+                    </div>
+                </div>
+                <button onclick="openFolderPicker()"
+                        class="inline-flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition text-sm shadow-sm">
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    Change Folder
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p class="text-xs font-medium text-gray-500">Email status</p>
+                    <p class="font-semibold text-gray-900" id="emailStatus">{{ gmail_status }}</p>
+                </div>
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p class="text-xs font-medium text-gray-500">AI status</p>
+                    <p class="font-semibold text-gray-900" id="aiStatus">Checking...</p>
                 </div>
             </div>
-            <a href="/auth/disconnect" onclick="return confirm('Disconnect your email account?')" class="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition">
-                Disconnect
-            </a>
         </div>
     </div>
     {% endif %}
 
-    <!-- Status Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="flex items-center gap-3">
-                <div class="p-2 bg-blue-100 rounded-lg">
-                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                    </svg>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500">Email Status</p>
-                    <p class="font-semibold text-gray-800" id="emailStatus">{{ gmail_status }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="flex items-center gap-3">
-                <div class="p-2 bg-purple-100 rounded-lg">
-                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                    </svg>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500">AI Status</p>
-                    <p class="font-semibold text-gray-800" id="aiStatus">Checking...</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Main Content Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Email List -->
-        <div class="bg-white rounded-lg shadow">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div class="p-4 border-b space-y-3">
                 <div class="flex justify-between items-center">
                     <div class="flex items-center gap-3">
@@ -163,7 +180,7 @@
                 </div>
                 <!-- Selection Actions -->
                 <div class="flex gap-2" id="selectionActions" style="display: none;">
-                    <button onclick="parseSelectedEmails()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition text-sm flex items-center gap-1">
+                    <button onclick="parseSelectedEmails()" class="bg-malta-blue text-white px-3 py-1.5 rounded-lg hover:bg-malta-blue-dark transition text-sm flex items-center gap-1">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                         </svg>
@@ -174,20 +191,39 @@
                     </button>
                 </div>
                 <!-- Search Bar -->
-                <div class="flex gap-2">
-                    <input type="text" id="emailSearch" placeholder="Search emails (e.g., from:supplier, subject:invoice)"
-                           class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue text-sm"
-                           onkeypress="if(event.key==='Enter') searchEmails()">
-                    <button onclick="searchEmails()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition text-sm">
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                    <div class="sm:col-span-4">
+                        <label for="emailSearch" class="block text-xs font-medium text-gray-600 mb-1">Search text</label>
+                        <input type="text" id="emailSearch" placeholder="Filter emails or search server..."
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue text-sm"
+                               oninput="filterEmailsLocally()"
+                               onkeypress="if(event.key==='Enter') searchEmails()">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="emailDateFrom" class="block text-xs font-medium text-gray-600 mb-1">From</label>
+                        <input type="date" id="emailDateFrom" class="w-full rounded-lg border-gray-300 shadow-sm text-sm px-2 py-[7px]" title="Start date">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="emailDateTo" class="block text-xs font-medium text-gray-600 mb-1">To</label>
+                        <input type="date" id="emailDateTo" class="w-full rounded-lg border-gray-300 shadow-sm text-sm px-2 py-[7px]" title="End date">
+                    </div>
+                    <button onclick="searchEmails()" class="sm:col-span-3 bg-malta-blue text-white px-3 py-2 rounded-lg hover:bg-malta-blue-dark transition text-sm flex items-center justify-center gap-1.5" title="Search email server">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         Search
                     </button>
-                    <button onclick="clearSearch()" class="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-300 transition text-sm">
+                    <button onclick="clearSearch()" class="sm:col-span-1 bg-gray-200 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-300 transition text-sm" title="Clear search filters">
                         Clear
                     </button>
                 </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="text-gray-500">Quick range:</span>
+                    <button type="button" onclick="setDateRangePreset('this_month')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">This month</button>
+                    <button type="button" onclick="setDateRangePreset('last_30')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">Last 30 days</button>
+                    <button type="button" onclick="setDateRangePreset('today')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">Today</button>
+                </div>
                 <p class="text-xs text-gray-500" id="searchStatus">Showing unread emails</p>
             </div>
-            <div class="divide-y max-h-[500px] overflow-y-auto" id="emailList">
+            <div class="p-2 space-y-2 max-h-[500px] overflow-y-auto bg-gray-50" id="emailList">
                 <div class="p-8 text-center text-gray-500">
                     {% if authenticated_email %}
                     <svg class="animate-spin w-8 h-8 mx-auto mb-4 text-malta-blue" fill="none" viewBox="0 0 24 24">
@@ -206,32 +242,71 @@
         </div>
 
         <!-- Invoice Form -->
-        <div class="bg-white rounded-lg shadow">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div class="p-4 border-b">
                 <h3 class="font-bold text-gray-800">Create Invoice from Email</h3>
                 <p class="text-sm text-gray-500 mt-1">Select an email to parse, then review and complete the form</p>
             </div>
             <div class="p-4" id="invoiceFormContainer">
-                <div class="text-center text-gray-500 py-8">
-                    <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    <p>Select an email from the list to parse</p>
+                <div class="text-center py-16">
+                    <div class="w-16 h-16 mx-auto mb-5 rounded-full bg-blue-50 flex items-center justify-center">
+                        <svg class="w-8 h-8 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-gray-500 font-medium">Select an email to parse</p>
+                    <p class="text-gray-400 text-sm mt-1">Click "Parse" on any email to extract invoice data</p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Instructions -->
-    <div class="bg-blue-50 rounded-lg p-4">
-        <h4 class="font-semibold text-blue-800 mb-2">How to use:</h4>
-        <ol class="list-decimal list-inside text-blue-700 space-y-1 text-sm">
+    <details class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+        <summary class="cursor-pointer select-none font-semibold text-gray-800">
+            How to use
+        </summary>
+        <ol class="mt-3 list-decimal list-inside text-gray-700 space-y-1 text-sm">
             <li>Forward invoice emails to your connected email account</li>
             <li>Emails load automatically (or click "Refresh" to reload)</li>
             <li>Click "Parse" on an email to extract invoice data using AI</li>
             <li>Review the extracted data and fill in required fields (Invoice Number, PJV Number)</li>
             <li>Select or create a supplier, then submit to create the invoice</li>
         </ol>
+    </details>
+</div>
+
+<!-- Folder Picker Modal -->
+<div id="folderPickerModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] flex flex-col">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800">Select Invoice Folder</h3>
+            <button onclick="closeFolderPicker()" class="text-gray-400 hover:text-gray-600" aria-label="Close folder picker">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="p-4 text-sm text-gray-600 bg-amber-50 border-b">
+            Select a folder where you store invoice emails. The system will only read emails from this folder.
+        </div>
+        <div class="flex-1 overflow-y-auto p-2" id="folderList">
+            <div class="p-8 text-center text-gray-500">
+                <svg class="animate-spin w-8 h-8 mx-auto mb-4 text-amber-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p>Loading folders...</p>
+            </div>
+        </div>
+        <div class="p-4 border-t bg-gray-50 flex gap-2">
+            <button onclick="clearFolderSelection()" class="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition text-sm">
+                Use Inbox (Default)
+            </button>
+            <button onclick="closeFolderPicker()" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-sm">
+                Cancel
+            </button>
+        </div>
     </div>
 </div>
 
@@ -254,7 +329,7 @@
             <p id="toastTitle" class="font-semibold"></p>
             <p id="toastMessage" class="text-sm mt-1"></p>
         </div>
-        <button onclick="hideToast()" class="flex-shrink-0 text-gray-400 hover:text-gray-600">
+        <button onclick="hideToast()" class="flex-shrink-0 text-gray-400 hover:text-gray-600" aria-label="Close notification">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
@@ -270,19 +345,34 @@ const methodRequestCodes = {{ method_request_codes | tojson | safe }};
 const methodProcurementCodes = {{ method_procurement_codes | tojson | safe }};
 
 let currentEmailId = null;
+let loadedEmails = []; // Store loaded emails for instant local filtering
+let currentEmailPage = 1;
+const emailsPerPage = 50;
 
 // Check AI status and auto-load emails on page load
 document.addEventListener('DOMContentLoaded', async () => {
     // Check AI status
-    try {
-        const response = await fetch('/email/test-ai');
-        const data = await response.json();
-        document.getElementById('aiStatus').textContent = data.success ? 'Connected' : 'Error';
-        document.getElementById('aiStatus').className = data.success ? 'font-semibold text-green-600' : 'font-semibold text-red-600';
-    } catch (e) {
-        document.getElementById('aiStatus').textContent = 'Error';
-        document.getElementById('aiStatus').className = 'font-semibold text-red-600';
+    const aiStatusEl = document.getElementById('aiStatus');
+    if (aiStatusEl) {
+        const setAiStatus = (text, colorClass) => {
+            aiStatusEl.textContent = text;
+            aiStatusEl.classList.remove('text-gray-900', 'text-gray-800', 'text-green-600', 'text-red-600');
+            aiStatusEl.classList.add('font-semibold', colorClass);
+        };
+
+        try {
+            const response = await fetch('/email/test-ai');
+            const data = await response.json();
+            setAiStatus(data.success ? 'Connected' : 'Error', data.success ? 'text-green-600' : 'text-red-600');
+        } catch (e) {
+            setAiStatus('Error', 'text-red-600');
+        }
     }
+
+    // Load selected folder info
+    {% if authenticated_email %}
+    loadSelectedFolder();
+    {% endif %}
 
     // Auto-load emails if user is authenticated
     {% if authenticated_email %}
@@ -464,93 +554,243 @@ function showError(message) {
     showToast('error', 'Error', message, 6000);
 }
 
+// ===== FOLDER MANAGEMENT FUNCTIONS =====
+let selectedFolderId = null;
+let selectedFolderName = null;
+
+async function loadSelectedFolder() {
+    try {
+        const response = await fetch('/email/folders');
+        const data = await response.json();
+
+        if (data.success) {
+            selectedFolderId = data.selected_folder_id;
+            selectedFolderName = data.selected_folder_name;
+
+            const display = document.getElementById('selectedFolderName');
+            if (display) {
+                if (selectedFolderName) {
+                    display.textContent = selectedFolderName;
+                    display.className = 'font-semibold text-amber-700';
+                } else {
+                    display.textContent = 'Inbox (all unread)';
+                    display.className = 'font-semibold text-gray-600';
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Error loading folder selection:', e);
+        const display = document.getElementById('selectedFolderName');
+        if (display) {
+            display.textContent = 'Inbox (default)';
+        }
+    }
+}
+
+function openFolderPicker() {
+    const modal = document.getElementById('folderPickerModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    loadFolders();
+}
+
+function closeFolderPicker() {
+    const modal = document.getElementById('folderPickerModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function loadFolders() {
+    const folderList = document.getElementById('folderList');
+    folderList.innerHTML = `
+        <div class="p-8 text-center text-gray-500">
+            <svg class="animate-spin w-8 h-8 mx-auto mb-4 text-amber-500" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p>Loading folders...</p>
+        </div>
+    `;
+
+    try {
+        const response = await fetch('/email/folders');
+        const data = await response.json();
+
+        if (!data.success) {
+            folderList.innerHTML = `<div class="p-8 text-center text-red-500">${data.error || 'Failed to load folders'}</div>`;
+            return;
+        }
+
+        if (data.folders.length === 0) {
+            folderList.innerHTML = `<div class="p-8 text-center text-gray-500">No folders found</div>`;
+            return;
+        }
+
+        folderList.innerHTML = data.folders.map(folder => {
+            // Escape folder ID for use in JavaScript string (handle special chars)
+            const escapedId = folder.id.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const escapedName = escapeHtml(folder.name).replace(/'/g, "\\'");
+            return `
+            <div class="p-3 rounded-lg cursor-pointer hover:bg-amber-50 transition flex items-center justify-between ${selectedFolderId === folder.id ? 'bg-amber-100 border border-amber-300' : 'bg-white border border-gray-200'}"
+                 onclick="selectFolder('${escapedId}', '${escapedName}')">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 ${selectedFolderId === folder.id ? 'text-amber-600' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    <span class="${selectedFolderId === folder.id ? 'font-semibold text-amber-800' : 'text-gray-700'}">${escapeHtml(folder.name)}</span>
+                </div>
+                ${folder.total_items ? `<span class="text-xs text-gray-500">${folder.total_items} items</span>` : ''}
+            </div>
+        `}).join('');
+
+    } catch (e) {
+        folderList.innerHTML = `<div class="p-8 text-center text-red-500">Error loading folders: ${e.message}</div>`;
+    }
+}
+
+async function selectFolder(folderId, folderName) {
+    try {
+        const response = await fetch('/email/folders/select', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_id: folderId, folder_name: folderName })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            selectedFolderId = folderId;
+            selectedFolderName = folderName;
+
+            // Update display
+            const display = document.getElementById('selectedFolderName');
+            if (display) {
+                display.textContent = folderName;
+                display.className = 'font-semibold text-amber-700';
+            }
+
+            closeFolderPicker();
+            showSuccess(`Now reading emails from: ${folderName}`);
+
+            // Reload emails from new folder
+            checkEmails();
+        } else {
+            showError(data.error || 'Failed to select folder');
+        }
+    } catch (e) {
+        showError('Error selecting folder: ' + e.message);
+    }
+}
+
+async function clearFolderSelection() {
+    try {
+        const response = await fetch('/email/folders/select', { method: 'DELETE' });
+        const data = await response.json();
+
+        if (data.success) {
+            selectedFolderId = null;
+            selectedFolderName = null;
+
+            // Update display
+            const display = document.getElementById('selectedFolderName');
+            if (display) {
+                display.textContent = 'Inbox (all unread)';
+                display.className = 'font-semibold text-gray-600';
+            }
+
+            closeFolderPicker();
+            showSuccess('Now reading unread emails from inbox');
+
+            // Reload emails
+            checkEmails();
+        } else {
+            showError(data.error || 'Failed to clear folder selection');
+        }
+    } catch (e) {
+        showError('Error: ' + e.message);
+    }
+}
+
 function showSuccess(message) {
     showToast('success', 'Success', message, 4000);
 }
 
 async function checkEmails(query = null) {
-    showLoading(query ? 'Searching emails...' : 'Checking emails...');
+    currentEmailPage = 1;
+    // Show inline loading in the email list (not the centered overlay)
+    const emailList = document.getElementById('emailList');
+    emailList.innerHTML = `
+        <div class="p-8 text-center text-gray-500">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <p>${query ? 'Searching emails...' : 'Loading emails...'}</p>
+        </div>
+    `;
 
     try {
-        const url = query ? `/email/check?q=${encodeURIComponent(query)}` : '/email/check';
-        const response = await fetch(url);
+        const df = document.getElementById('emailDateFrom').value;
+        const dt = document.getElementById('emailDateTo').value;
+        const params = new URLSearchParams();
+        if (query) params.append('q', query);
+        if (df) params.append('date_from', df);
+        if (dt) params.append('date_to', dt);
+        const response = await fetch(`/email/check?${params.toString()}`);
         const data = await response.json();
 
         if (data.error) {
             showError(data.error);
-            hideLoading();
+            emailList.innerHTML = `<div class="p-8 text-center text-red-500">${data.error}</div>`;
             return;
         }
+
+        // Store emails for local filtering
+        loadedEmails = data.emails;
 
         // Emails are already grouped by thread on the backend
         const displayEmails = data.emails;
 
         // Update search status
+        const dfText = df ? formatDateOnly(df) : '';
+        const dtText = dt ? formatDateOnly(dt) : '';
+        const rangeText = (dfText || dtText) ? ` between ${dfText || '...'} and ${dtText || '...'}` : '';
         const statusText = data.query === 'is:unread'
-            ? `Showing ${displayEmails.length} ${displayEmails.length === 1 ? 'thread' : 'threads'} (${data.count} total messages)`
-            : `Found ${displayEmails.length} ${displayEmails.length === 1 ? 'thread' : 'threads'} for: "${data.query}"`;
+            ? `Showing ${displayEmails.length} ${displayEmails.length === 1 ? 'thread' : 'threads'} (${data.count} total messages)${rangeText}`
+            : `Found ${displayEmails.length} ${displayEmails.length === 1 ? 'thread' : 'threads'} for: "${data.query}"${rangeText}`;
         document.getElementById('searchStatus').textContent = statusText;
 
-        const emailList = document.getElementById('emailList');
-
-        if (displayEmails.length === 0) {
-            emailList.innerHTML = `
-                <div class="p-8 text-center text-gray-500">
-                    <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
-                    </svg>
-                    <p>No emails found</p>
-                </div>
-            `;
-        } else {
-            emailList.innerHTML = displayEmails.map(email => `
-                <div class="p-4 hover:bg-gray-50 border-l-4 ${email.thread_count > 1 ? 'border-purple-400 bg-purple-50/30' : 'border-transparent'}" data-email-id="${email.id}" data-thread-id="${email.thread_id}">
-                    <div class="flex items-start gap-3">
-                        <!-- Checkbox -->
-                        <input type="checkbox" class="email-checkbox mt-1 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                               value="${email.id}"
-                               data-thread-id="${email.thread_id}"
-                               onchange="updateEmailSelection()"
-                               onclick="event.stopPropagation()">
-
-                        <!-- Content -->
-                        <div class="flex-1 min-w-0 cursor-pointer" onclick="selectEmail('${email.id}')">
-                            <div class="flex items-start gap-2">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        ${email.thread_count > 1 ? `
-                                            <svg class="w-4 h-4 text-purple-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Thread with ${email.thread_count} messages">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
-                                            </svg>
-                                            <span class="text-xs font-semibold text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">${email.thread_count} messages</span>
-                                        ` : ''}
-                                    </div>
-                                    <p class="font-medium text-gray-900 truncate">${escapeHtml(email.subject)}</p>
-                                    <p class="text-sm text-gray-500 truncate">${escapeHtml(email.from)}</p>
-                                    <p class="text-xs text-gray-400 mt-1">${email.date}</p>
-                                    ${email.thread_count > 1 ? `
-                                        <p class="text-xs text-purple-600 mt-1">📧 Conversation thread - Click Parse to analyze all ${email.thread_count} messages</p>
-                                    ` : ''}
-                                </div>
-                            </div>
-                            <p class="text-sm text-gray-600 mt-2 line-clamp-2">${escapeHtml(email.snippet)}</p>
-                        </div>
-
-                        <!-- Parse Button -->
-                        <button onclick="event.stopPropagation(); parseEmail('${email.id}')" class="ml-2 bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700 transition whitespace-nowrap">
-                            Parse
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
+        // Render emails using shared function
+        renderEmails(displayEmails);
     } catch (error) {
         showError('Error checking emails: ' + error.message);
+        emailList.innerHTML = `<div class="p-8 text-center text-red-500">Error loading emails</div>`;
     }
-
-    hideLoading();
 }
 
+// Instant local filtering as user types
+function filterEmailsLocally() {
+    currentEmailPage = 1;
+    const query = document.getElementById('emailSearch').value.trim().toLowerCase();
+
+    if (!query) {
+        // Show all loaded emails
+        renderEmails(loadedEmails);
+        document.getElementById('searchStatus').textContent =
+            `Showing ${loadedEmails.length} ${loadedEmails.length === 1 ? 'thread' : 'threads'}`;
+        return;
+    }
+
+    // Filter locally - instant!
+    const filtered = loadedEmails.filter(email =>
+        email.subject.toLowerCase().includes(query) ||
+        email.from.toLowerCase().includes(query) ||
+        (email.snippet && email.snippet.toLowerCase().includes(query))
+    );
+
+    renderEmails(filtered);
+    document.getElementById('searchStatus').textContent =
+        `Filtered: ${filtered.length} of ${loadedEmails.length} threads matching "${query}"`;
+}
+
+// Search server-side email provider (for new/all emails search)
 function searchEmails() {
     const query = document.getElementById('emailSearch').value.trim();
     if (query) {
@@ -560,9 +800,197 @@ function searchEmails() {
     }
 }
 
+// Backward-compatible alias for existing inline handlers
+function searchGmail() {
+    searchEmails();
+}
+
 function clearSearch() {
     document.getElementById('emailSearch').value = '';
+    document.getElementById('emailDateFrom').value = '';
+    document.getElementById('emailDateTo').value = '';
     checkEmails(); // Reset to unread emails
+}
+
+function setDateRangePreset(preset) {
+    const fromInput = document.getElementById('emailDateFrom');
+    const toInput = document.getElementById('emailDateTo');
+    const today = new Date();
+
+    const toIsoDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    if (preset === 'today') {
+        const val = toIsoDate(today);
+        fromInput.value = val;
+        toInput.value = val;
+    } else if (preset === 'last_30') {
+        const start = new Date(today);
+        start.setDate(start.getDate() - 29);
+        fromInput.value = toIsoDate(start);
+        toInput.value = toIsoDate(today);
+    } else if (preset === 'this_month') {
+        const start = new Date(today.getFullYear(), today.getMonth(), 1);
+        const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        fromInput.value = toIsoDate(start);
+        toInput.value = toIsoDate(end);
+    }
+
+    searchEmails();
+}
+
+function formatDateOnly(value) {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    });
+}
+
+function formatDateTime(value) {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function formatRelativeTime(value) {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+
+    const diffMs = parsed.getTime() - Date.now();
+    const absSeconds = Math.round(Math.abs(diffMs) / 1000);
+    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
+    if (absSeconds < 60) return rtf.format(Math.round(diffMs / 1000), 'second');
+    const absMinutes = Math.round(absSeconds / 60);
+    if (absMinutes < 60) return rtf.format(Math.round(diffMs / 60000), 'minute');
+    const absHours = Math.round(absMinutes / 60);
+    if (absHours < 24) return rtf.format(Math.round(diffMs / 3600000), 'hour');
+    return rtf.format(Math.round(diffMs / 86400000), 'day');
+}
+
+// Render emails to the list (used by both server fetch and local filter)
+function renderEmails(emails) {
+    const emailList = document.getElementById('emailList');
+
+    if (emails.length === 0) {
+        emailList.innerHTML = `
+            <div class="p-8 text-center text-gray-500">
+                <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                </svg>
+                <p>No emails found</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Paginate
+    const totalEmails = emails.length;
+    const totalPages = Math.ceil(totalEmails / emailsPerPage);
+    if (currentEmailPage > totalPages) currentEmailPage = totalPages;
+    if (currentEmailPage < 1) currentEmailPage = 1;
+    const startIdx = (currentEmailPage - 1) * emailsPerPage;
+    const pageEmails = emails.slice(startIdx, startIdx + emailsPerPage);
+
+    let html = pageEmails.map(email => {
+        const fullDate = formatDateTime(email.date);
+        const relativeDate = formatRelativeTime(email.date);
+        const threadPill = email.thread_count > 1
+            ? `<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">${email.thread_count} messages</span>`
+            : '';
+
+        return `
+            <div class="p-3 bg-white border rounded-lg border-gray-200 hover:shadow-sm transition ${email.thread_count > 1 ? 'border-l-4 border-l-blue-400' : ''}" data-email-id="${email.id}" data-thread-id="${email.thread_id}">
+                <div class="flex items-start gap-3">
+                    <input type="checkbox" class="email-checkbox mt-1 rounded border-gray-300 text-malta-blue focus:ring-blue-500"
+                           value="${email.id}"
+                           data-thread-id="${email.thread_id}"
+                           onchange="updateEmailSelection()"
+                           onclick="event.stopPropagation()">
+
+                    <div class="flex-1 min-w-0 cursor-pointer" onclick="selectEmail('${email.id}', this)">
+                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                            ${threadPill}
+                            ${relativeDate ? `<span class="text-xs text-gray-500">${escapeHtml(relativeDate)}</span>` : ''}
+                            ${fullDate ? `<span class="text-xs text-gray-400" title="${escapeHtml(email.date || '')}">${escapeHtml(fullDate)}</span>` : ''}
+                        </div>
+                        <p class="font-semibold text-gray-900 leading-5">${escapeHtml(email.subject)}</p>
+                        <p class="text-sm text-gray-500 truncate mt-0.5">${escapeHtml(email.from)}</p>
+                        ${email.thread_count > 1 ? `<p class="text-xs text-blue-600 mt-1">Conversation thread. Parse includes all messages.</p>` : ''}
+                        <p class="text-sm text-gray-600 mt-2 line-clamp-2">${escapeHtml(email.snippet)}</p>
+                    </div>
+
+                    <button id="parse-btn-${email.id}"
+                            onclick="event.stopPropagation(); parseEmail('${email.id}')"
+                            class="ml-2 bg-malta-blue text-white px-3 py-1.5 rounded text-sm hover:bg-malta-blue-dark transition whitespace-nowrap disabled:opacity-50 disabled:cursor-wait">
+                        Parse
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Add pagination controls if more than one page
+    if (totalPages > 1) {
+        const startItem = startIdx + 1;
+        const endItem = Math.min(startIdx + emailsPerPage, totalEmails);
+        html += `
+            <div class="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+                <span class="text-sm text-gray-600">
+                    Showing ${startItem}-${endItem} of ${totalEmails} threads
+                </span>
+                <div class="flex items-center gap-2">
+                    <button onclick="changeEmailPage(${currentEmailPage - 1})"
+                            ${currentEmailPage <= 1 ? 'disabled' : ''}
+                            class="px-3 py-1 text-sm rounded border ${currentEmailPage <= 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}">
+                        Previous
+                    </button>
+                    <span class="text-sm text-gray-600">Page ${currentEmailPage} of ${totalPages}</span>
+                    <button onclick="changeEmailPage(${currentEmailPage + 1})"
+                            ${currentEmailPage >= totalPages ? 'disabled' : ''}
+                            class="px-3 py-1 text-sm rounded border ${currentEmailPage >= totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}">
+                        Next
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    emailList.innerHTML = html;
+}
+
+function changeEmailPage(page) {
+    currentEmailPage = page;
+    // Re-render with the current filtered or full set
+    const query = document.getElementById('emailSearch').value.trim().toLowerCase();
+    if (query) {
+        const filtered = loadedEmails.filter(email =>
+            email.subject.toLowerCase().includes(query) ||
+            email.from.toLowerCase().includes(query) ||
+            (email.snippet && email.snippet.toLowerCase().includes(query))
+        );
+        renderEmails(filtered);
+    } else {
+        renderEmails(loadedEmails);
+    }
+    // Scroll to top of email list
+    document.getElementById('emailList').scrollIntoView({ behavior: 'smooth' });
 }
 
 function escapeHtml(text) {
@@ -571,17 +999,39 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-function selectEmail(emailId) {
-    // Highlight selected email
-    document.querySelectorAll('#emailList > div').forEach(el => {
-        el.classList.remove('bg-blue-50', 'border-l-4', 'border-malta-blue');
+function escapeJs(text) {
+    // Escape for use in JavaScript strings (within single quotes)
+    if (!text) return '';
+    return String(text)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+}
+
+function selectEmail(emailId, element) {
+    // Highlight selected email card
+    document.querySelectorAll('#emailList > div[data-email-id]').forEach(el => {
+        el.classList.remove('ring-2', 'ring-malta-blue', 'bg-blue-50');
     });
-    event.currentTarget.classList.add('bg-blue-50', 'border-l-4', 'border-malta-blue');
+    const row = element ? element.closest('div[data-email-id]') : null;
+    if (row) {
+        row.classList.add('ring-2', 'ring-malta-blue', 'bg-blue-50');
+    }
 }
 
 async function parseEmail(emailId) {
     currentEmailId = emailId;
-    showLoading('AI is parsing the email...');
+
+    // Disable parse button immediately for instant feedback
+    const parseBtn = document.getElementById(`parse-btn-${emailId}`);
+    if (parseBtn) {
+        parseBtn.disabled = true;
+        parseBtn.textContent = 'Parsing...';
+    }
+
+    showLoading('AI is parsing the email (this may take 10-30 seconds)...');
 
     try {
         const response = await fetch(`/email/parse/${emailId}`, { method: 'POST' });
@@ -589,6 +1039,10 @@ async function parseEmail(emailId) {
         // Check if response failed - use our new error handling!
         if (!response.ok) {
             hideLoading();
+            if (parseBtn) {
+                parseBtn.disabled = false;
+                parseBtn.textContent = 'Parse';
+            }
             await handleApiError(response);  // This shows a nice modal instead of ugly Chrome error
             return;
         }
@@ -599,12 +1053,20 @@ async function parseEmail(emailId) {
             // Old error format - still handle it
             showError(data.error);
             hideLoading();
+            if (parseBtn) {
+                parseBtn.disabled = false;
+                parseBtn.textContent = 'Parse';
+            }
             return;
         }
 
         showInvoiceForm(data.invoice_data);
     } catch (error) {
         showError('Error parsing email: ' + error.message);
+        if (parseBtn) {
+            parseBtn.disabled = false;
+            parseBtn.textContent = 'Parse';
+        }
     }
 
     hideLoading();
@@ -613,18 +1075,24 @@ async function parseEmail(emailId) {
 function showInvoiceForm(invoiceData, currentIndex = -1, totalCount = 1) {
     const container = document.getElementById('invoiceFormContainer');
 
-    // Build supplier options
-    let supplierOptions = '<option value="">-- Select Supplier --</option>';
-    supplierOptions += '<option value="-1">+ Add New Supplier</option>';
-
-    // Check if extracted supplier matches any existing
+    // Use fuzzy matching results from API (if available)
     let matchedSupplierId = '';
-    suppliers.forEach(s => {
-        const isMatch = s.name.toLowerCase().includes(invoiceData.supplier_name.toLowerCase()) ||
-                       invoiceData.supplier_name.toLowerCase().includes(s.name.toLowerCase());
-        if (isMatch && !matchedSupplierId) matchedSupplierId = s.id;
-        supplierOptions += `<option value="${s.id}" ${isMatch ? 'selected' : ''}>${escapeHtml(s.name)}</option>`;
-    });
+    let supplierMatches = invoiceData.supplier_matches || null;
+
+    if (supplierMatches && supplierMatches.auto_selected) {
+        // AI found a high-confidence match (>= 90%)
+        matchedSupplierId = supplierMatches.auto_selected.supplier_id;
+    } else if (supplierMatches && supplierMatches.matches && supplierMatches.matches.length > 0) {
+        // Has matches but no auto-selection (confidence < 90%)
+        // Leave matchedSupplierId empty so user can choose
+    } else {
+        // Fallback: Old simple matching (in case API doesn't return matches)
+        suppliers.forEach(s => {
+            const isMatch = s.name.toLowerCase().includes(invoiceData.supplier_name.toLowerCase()) ||
+                           invoiceData.supplier_name.toLowerCase().includes(s.name.toLowerCase());
+            if (isMatch && !matchedSupplierId) matchedSupplierId = s.id;
+        });
+    }
 
     // Build method request options
     let methodRequestOptions = '';
@@ -660,8 +1128,39 @@ function showInvoiceForm(invoiceData, currentIndex = -1, totalCount = 1) {
 
     container.innerHTML = `
         ${navigationHeader}
+
+        <!-- Email Source Info -->
+        ${invoiceData.email_subject || invoiceData.email_from ? `
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div class="flex items-start gap-3">
+                    <div class="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-medium text-blue-800 mb-1">Source Email</p>
+                        ${invoiceData.email_subject ? `
+                            <p class="font-medium text-gray-900 mb-1 break-words">${escapeHtml(invoiceData.email_subject)}</p>
+                        ` : ''}
+                        ${invoiceData.email_from ? `
+                            <p class="text-sm text-gray-700 flex items-center gap-1">
+                                <svg class="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                                <span class="break-words">${escapeHtml(invoiceData.email_from)}</span>
+                            </p>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        ` : ''}
+
         <form id="invoiceForm" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
             <input type="hidden" name="email_id" value="${invoiceData.email_id || currentEmailId}">
+            <input type="hidden" name="email_subject" value="${escapeHtml(invoiceData.email_subject || '')}">
+            <input type="hidden" name="email_from" value="${escapeHtml(invoiceData.email_from || '')}">
 
             <!-- Thread Info -->
             ${invoiceData.thread_count > 1 ? `
@@ -687,23 +1186,133 @@ function showInvoiceForm(invoiceData, currentIndex = -1, totalCount = 1) {
                 ${invoiceData.notes ? `<p class="text-sm text-purple-600 mt-2">${escapeHtml(invoiceData.notes)}</p>` : ''}
             </div>
 
+
             <!-- Extracted Supplier Name (for reference) -->
             <div class="bg-gray-50 rounded-lg p-3">
                 <p class="text-sm text-gray-500">Extracted Supplier Name:</p>
                 <p class="font-medium">${escapeHtml(invoiceData.supplier_name)}</p>
             </div>
 
+            <!-- Fuzzy Match Suggestions -->
+            ${supplierMatches && supplierMatches.matches && supplierMatches.matches.length > 0 ? `
+                <div class="bg-gradient-to-r from-green-50 to-blue-50 border ${supplierMatches.auto_selected ? 'border-green-300' : 'border-blue-300'} rounded-lg p-4">
+                    ${supplierMatches.auto_selected ? `
+                        <div class="flex items-center gap-2 mb-3">
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span class="text-sm font-semibold text-green-800">Auto-matched with high confidence</span>
+                        </div>
+                        <div class="bg-white rounded-lg p-3 mb-2">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-semibold text-gray-900">${escapeHtml(supplierMatches.auto_selected.supplier_name)}</p>
+                                    <p class="text-xs text-gray-500 mt-1">Best match</p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-bold">
+                                        ${Math.round(supplierMatches.auto_selected.confidence * 100)}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="flex items-center gap-2 mb-3">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span class="text-sm font-semibold text-blue-800">Possible matches found - please verify</span>
+                        </div>
+                    `}
+
+                    ${!supplierMatches.auto_selected && supplierMatches.matches.length > 0 ? `
+                        <p class="text-xs text-blue-700 mb-2">Top ${supplierMatches.matches.length} matches (click to select):</p>
+                        <div class="space-y-2">
+                            ${supplierMatches.matches.slice(0, 5).map(match => `
+                                <div class="bg-white rounded-lg p-2 hover:bg-blue-50 cursor-pointer transition border border-gray-200 hover:border-blue-400"
+                                     onclick="selectSupplierOption('${match.supplier_id}', '${escapeJs(match.supplier_name)}')">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1">
+                                            <p class="font-medium text-gray-900 text-sm">${escapeHtml(match.supplier_name)}</p>
+                                            <p class="text-xs text-gray-500">${match.confidence_label} match</p>
+                                        </div>
+                                        <div class="text-right ml-3">
+                                            <div class="inline-flex items-center gap-1 ${
+                                                match.confidence >= 0.8 ? 'bg-green-100 text-green-800' :
+                                                match.confidence >= 0.6 ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-gray-100 text-gray-600'
+                                            } px-2 py-1 rounded-full text-xs font-medium">
+                                                ${Math.round(match.confidence * 100)}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <p class="text-xs text-gray-600 mt-3 italic">Or search all ${suppliers.length} suppliers below</p>
+                    ` : supplierMatches.auto_selected ? `
+                        <p class="text-xs text-gray-600 mt-2 italic">If this doesn't look correct, you can search all ${suppliers.length} suppliers below</p>
+                    ` : ''}
+                </div>
+            ` : ''}
+
             <!-- Supplier Selection -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Supplier *</label>
-                <select name="supplier_id" id="supplierSelect" onchange="toggleNewSupplier()" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
-                    ${supplierOptions}
-                </select>
+                <input type="hidden" name="supplier_id" id="supplierIdInput" value="${matchedSupplierId || ''}">
+
+                <!-- Custom searchable dropdown -->
+                <div class="relative" id="supplierDropdown">
+                    <button type="button" id="supplierDropdownBtn"
+                        class="w-full text-left rounded-lg border border-gray-300 shadow-sm px-3 py-2 pr-10 bg-white focus:outline-none focus:ring-2 focus:ring-malta-blue focus:border-malta-blue relative">
+                        <span id="supplierSelectedText" class="block truncate">
+                            ${matchedSupplierId ? suppliers.find(s => s.id == matchedSupplierId)?.name || 'Select supplier...' : '<span class="text-gray-400">Select supplier...</span>'}
+                        </span>
+                        <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </span>
+                    </button>
+
+                    <!-- Dropdown panel -->
+                    <div id="supplierDropdownPanel" class="hidden absolute z-50 mt-1 w-full bg-white shadow-lg rounded-lg border border-gray-200 max-h-80 overflow-hidden">
+                        <!-- Search input -->
+                        <div class="p-2 border-b border-gray-100">
+                            <input type="text" id="supplierSearchInput" placeholder="Search suppliers..."
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-malta-blue focus:border-malta-blue">
+                        </div>
+
+                        <!-- Add New Supplier option -->
+                        <div id="addNewSupplierOption" class="px-3 py-2 cursor-pointer bg-blue-50 hover:bg-blue-100 border-b border-gray-200 flex items-center gap-2 text-malta-blue font-medium" onclick="selectSupplierOption('-1', '+ Add New Supplier')">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            Add New Supplier
+                        </div>
+
+                        <!-- Supplier list -->
+                        <div id="supplierList" class="max-h-48 overflow-y-auto">
+                            ${suppliers.map(s => `
+                                <div class="supplier-option px-3 py-2 cursor-pointer hover:bg-gray-100 ${matchedSupplierId == s.id ? 'bg-malta-blue text-white' : ''}"
+                                    data-value="${s.id}" data-name="${s.name.toLowerCase()}"
+                                    onclick="selectSupplierOption('${s.id}', '${escapeJs(s.name)}')">
+                                    ${escapeHtml(s.name)}
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <!-- No results message -->
+                        <div id="noResultsMsg" class="hidden px-3 py-4 text-center text-gray-500 text-sm">
+                            No suppliers found
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="newSupplierDiv" class="hidden">
                 <label class="block text-sm font-medium text-gray-700 mb-1">New Supplier Name</label>
-                <input type="text" name="new_supplier_name" value="${escapeHtml(invoiceData.supplier_name)}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                <input type="text" name="new_supplier_name" id="newSupplierNameInput" value="${escapeHtml(invoiceData.supplier_name)}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
             </div>
 
             <!-- Amounts -->
@@ -744,7 +1353,7 @@ function showInvoiceForm(invoiceData, currentIndex = -1, totalCount = 1) {
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Date *</label>
-                    <input type="date" name="invoice_date" value="${invoiceData.invoice_date}" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    <input type="date" name="invoice_date" value="${invoiceData.invoice_date}" max="${new Date().toISOString().split('T')[0]}" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Number * <span class="text-amber-600">(Manual)</span></label>
@@ -752,7 +1361,7 @@ function showInvoiceForm(invoiceData, currentIndex = -1, totalCount = 1) {
                 </div>
             </div>
 
-            <!-- PO and PJV Numbers -->
+            <!-- PO Number and PJV Number -->
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">PO Number (optional)</label>
@@ -760,7 +1369,33 @@ function showInvoiceForm(invoiceData, currentIndex = -1, totalCount = 1) {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">PJV Number * <span class="text-amber-600">(Manual)</span></label>
-                    <input type="text" name="pjv_number" required placeholder="Enter PJV number" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue bg-amber-50">
+                    <input type="text" name="pjv_number" value="${escapeHtml(invoiceData.pjv_number || '')}" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue bg-amber-50" placeholder="Stamp number when received">
+                </div>
+            </div>
+
+            <!-- Number Type Selection (TF or CHQ) -->
+            <div class="bg-blue-50 rounded-lg p-4">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Payment Type *</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="number_type" value="TF" checked
+                               class="text-malta-blue focus:ring-malta-blue"
+                               onchange="updateNumberPreview()">
+                        <span class="font-medium">TF</span>
+                        <span class="text-xs text-gray-500">(Transfer)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="number_type" value="CHQ"
+                               class="text-malta-blue focus:ring-malta-blue"
+                               onchange="updateNumberPreview()">
+                        <span class="font-medium">CHQ</span>
+                        <span class="text-xs text-gray-500">(Cheque)</span>
+                    </label>
+                </div>
+                <div class="mt-3 flex items-center gap-2">
+                    <span class="text-sm text-gray-600">Next number:</span>
+                    <span id="nextNumberPreview" class="font-bold text-malta-blue">Loading...</span>
+                    <span class="text-xs text-green-600">(Auto-generated on approval)</span>
                 </div>
             </div>
 
@@ -776,20 +1411,166 @@ function showInvoiceForm(invoiceData, currentIndex = -1, totalCount = 1) {
         </form>
     `;
 
-    // Toggle new supplier field if -1 is pre-selected
+    // Initialize the supplier dropdown
+    initSupplierDropdown();
+
+    // If no matched supplier, pre-select "Add New Supplier"
     if (!matchedSupplierId) {
-        document.getElementById('supplierSelect').value = '-1';
-        toggleNewSupplier();
+        selectSupplierOption('-1', '+ Add New Supplier');
     }
 
     // Add form submit handler
     document.getElementById('invoiceForm').addEventListener('submit', submitInvoice);
+
+    // Load next number preview
+    updateNumberPreview();
 }
 
-function toggleNewSupplier() {
-    const select = document.getElementById('supplierSelect');
-    const div = document.getElementById('newSupplierDiv');
-    div.classList.toggle('hidden', select.value !== '-1');
+// Fetch and display the next TF/CHQ number
+async function updateNumberPreview() {
+    const numberType = document.querySelector('input[name="number_type"]:checked')?.value || 'TF';
+    const preview = document.getElementById('nextNumberPreview');
+
+    if (!preview) return;
+
+    preview.textContent = 'Loading...';
+    preview.className = 'font-bold text-gray-400';
+
+    try {
+        const response = await fetch(`/email/next-number/${numberType}`);
+        const data = await response.json();
+
+        if (data.success) {
+            preview.textContent = `${numberType} ${data.next_number}`;
+            // TF = blue, CHQ = orange
+            if (numberType === 'CHQ') {
+                preview.className = 'font-bold text-amber-600';
+            } else {
+                preview.className = 'font-bold text-malta-blue';
+            }
+        } else {
+            preview.textContent = 'Error loading';
+            preview.className = 'font-bold text-red-500';
+        }
+    } catch (error) {
+        preview.textContent = 'Error loading';
+        preview.className = 'font-bold text-red-500';
+        console.error('Error fetching next number:', error);
+    }
+}
+
+// Supplier dropdown functions
+let isSupplierDropdownOpen = false;
+let supplierDropdownClickHandler = null;  // Track the document click handler
+
+function toggleSupplierDropdown() {
+    const panel = document.getElementById('supplierDropdownPanel');
+    const searchInput = document.getElementById('supplierSearchInput');
+
+    if (isSupplierDropdownOpen) {
+        panel.classList.add('hidden');
+        isSupplierDropdownOpen = false;
+    } else {
+        panel.classList.remove('hidden');
+        isSupplierDropdownOpen = true;
+        searchInput.focus();
+        searchInput.value = '';
+        filterSupplierOptions('');
+    }
+}
+
+function selectSupplierOption(value, text) {
+    const hiddenInput = document.getElementById('supplierIdInput');
+    const selectedText = document.getElementById('supplierSelectedText');
+    const newSupplierDiv = document.getElementById('newSupplierDiv');
+    const newSupplierInput = document.getElementById('newSupplierNameInput');
+
+    hiddenInput.value = value;
+
+    if (value === '-1') {
+        selectedText.innerHTML = '<span class="text-malta-blue font-medium">+ Add New Supplier</span>';
+        newSupplierDiv.classList.remove('hidden');
+        setTimeout(() => newSupplierInput.focus(), 100);
+    } else {
+        selectedText.textContent = text;
+        newSupplierDiv.classList.add('hidden');
+    }
+
+    // Update selection highlight
+    document.querySelectorAll('.supplier-option').forEach(opt => {
+        opt.classList.remove('bg-malta-blue', 'text-white');
+    });
+    const selectedOpt = document.querySelector(`.supplier-option[data-value="${value}"]`);
+    if (selectedOpt) {
+        selectedOpt.classList.add('bg-malta-blue', 'text-white');
+    }
+
+    // Close dropdown
+    document.getElementById('supplierDropdownPanel').classList.add('hidden');
+    isSupplierDropdownOpen = false;
+}
+
+function filterSupplierOptions(query) {
+    const lowerQuery = query.toLowerCase();
+    let visibleCount = 0;
+
+    document.querySelectorAll('.supplier-option').forEach(opt => {
+        const name = opt.getAttribute('data-name');
+        if (name && name.includes(lowerQuery)) {
+            opt.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            opt.classList.add('hidden');
+        }
+    });
+
+    // Show/hide no results message
+    const noResults = document.getElementById('noResultsMsg');
+    if (noResults) {
+        if (visibleCount === 0 && query.trim() !== '') {
+            noResults.classList.remove('hidden');
+        } else {
+            noResults.classList.add('hidden');
+        }
+    }
+}
+
+function initSupplierDropdown() {
+    const btn = document.getElementById('supplierDropdownBtn');
+    const searchInput = document.getElementById('supplierSearchInput');
+    const dropdown = document.getElementById('supplierDropdown');
+
+    if (btn) {
+        btn.addEventListener('click', toggleSupplierDropdown);
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            filterSupplierOptions(e.target.value);
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('supplierDropdownPanel').classList.add('hidden');
+                isSupplierDropdownOpen = false;
+            }
+        });
+    }
+
+    // Remove old click handler if it exists (prevents stacking handlers when form is re-rendered)
+    if (supplierDropdownClickHandler) {
+        document.removeEventListener('click', supplierDropdownClickHandler);
+    }
+
+    // Close dropdown when clicking outside
+    supplierDropdownClickHandler = (e) => {
+        const currentDropdown = document.getElementById('supplierDropdown');
+        if (currentDropdown && !currentDropdown.contains(e.target)) {
+            document.getElementById('supplierDropdownPanel')?.classList.add('hidden');
+            isSupplierDropdownOpen = false;
+        }
+    };
+    document.addEventListener('click', supplierDropdownClickHandler);
 }
 
 async function submitInvoice(e) {

@@ -23,8 +23,15 @@
     </div>
     {% endif %}
 
+    {% if errors and errors.database %}
+    <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6">
+        <strong>Error:</strong> {{ errors.database }}
+    </div>
+    {% endif %}
+
     <!-- Form -->
-    <form method="POST" action="{% if is_edit %}/invoices/{{ invoice.id }}/edit{% else %}/invoices/create{% endif %}" class="bg-white rounded-lg shadow p-6 space-y-6">
+    <form method="POST" enctype="multipart/form-data" action="{% if is_edit %}/invoices/{{ invoice.id }}/edit{% else %}/invoices/create{% endif %}" class="bg-white rounded-lg shadow p-6 space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
 
         <!-- Supplier Section -->
         <div class="border-b pb-6">
@@ -32,25 +39,107 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Supplier *</label>
-                    <select name="supplier_id" id="supplierSelect" onchange="toggleNewSupplier()" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.supplier_id %}border-red-500{% endif %}">
-                        <option value="">-- Select Supplier --</option>
-                        {% for supplier in suppliers %}
-                        <option value="{{ supplier.id }}" {% if (invoice and invoice.supplier_id == supplier.id) or (form_data and form_data.supplier_id == supplier.id) %}selected{% endif %}>
-                            {{ supplier.name }}
-                        </option>
-                        {% endfor %}
-                        <option value="-1" {% if form_data and form_data.supplier_id == -1 %}selected{% endif %}>+ Add New Supplier</option>
-                    </select>
+                    <!-- Hidden input for actual form value -->
+                    <input type="hidden" name="supplier_id" id="supplierIdInput" value="{% if invoice %}{{ invoice.supplier_id }}{% elif form_data and form_data.supplier_id %}{{ form_data.supplier_id }}{% endif %}">
+
+                    <!-- Custom searchable dropdown -->
+                    <div class="relative" id="supplierDropdown">
+                        <button type="button" id="supplierDropdownBtn"
+                            class="w-full text-left rounded-lg border shadow-sm px-3 py-2 pr-10 bg-white focus:outline-none focus:ring-2 focus:ring-malta-blue focus:border-malta-blue relative {% if errors.supplier_id %}border-red-500{% else %}border-gray-300{% endif %}">
+                            <span id="supplierSelectedText" class="block truncate">
+                                {% if form_data and form_data.supplier_id == -1 %}
+                                    + Add New Supplier
+                                {% elif invoice and invoice.supplier_name %}
+                                    {{ invoice.supplier_name }}
+                                {% elif form_data and form_data.supplier_id %}
+                                    {% for s in suppliers %}{% if s.id == form_data.supplier_id %}{{ s.name }}{% endif %}{% endfor %}
+                                {% else %}
+                                    <span class="text-gray-400">Select supplier...</span>
+                                {% endif %}
+                            </span>
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </span>
+                        </button>
+
+                        <!-- Dropdown panel -->
+                        <div id="supplierDropdownPanel" class="hidden absolute z-50 mt-1 w-full bg-white shadow-lg rounded-lg border border-gray-200 max-h-80 overflow-hidden">
+                            <!-- Search input -->
+                            <div class="p-2 border-b border-gray-100">
+                                <input type="text" id="supplierSearchInput" placeholder="Search suppliers..."
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-malta-blue focus:border-malta-blue">
+                            </div>
+
+                            <!-- Add New Supplier option -->
+                            <div id="addNewSupplierOption" class="px-3 py-2 cursor-pointer bg-blue-50 hover:bg-blue-100 border-b border-gray-200 flex items-center gap-2 text-malta-blue font-medium" data-value="-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                Add New Supplier
+                            </div>
+
+                            <!-- Supplier list -->
+                            <div id="supplierList" class="max-h-48 overflow-y-auto">
+                                {% for supplier in suppliers %}
+                                <div class="supplier-option px-3 py-2 cursor-pointer hover:bg-gray-100 {% if (invoice and invoice.supplier_id == supplier.id) or (form_data and form_data.supplier_id == supplier.id) %}bg-malta-blue text-white hover:bg-malta-blue{% endif %}"
+                                    data-value="{{ supplier.id }}" data-name="{{ supplier.name|lower }}">
+                                    {{ supplier.name }}
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- No results message -->
+                            <div id="noResultsMsg" class="hidden px-3 py-4 text-center text-gray-500 text-sm">
+                                No suppliers found
+                            </div>
+                        </div>
+                    </div>
                     {% if errors.supplier_id %}
                     <p class="text-red-500 text-sm mt-1">{{ errors.supplier_id }}</p>
                     {% endif %}
                 </div>
-                <div id="newSupplierDiv" class="{% if not (form_data and form_data.supplier_id == -1) %}hidden{% endif %}">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">New Supplier Name *</label>
-                    <input type="text" name="new_supplier_name" value="{{ form_data.new_supplier_name if form_data else '' }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.new_supplier_name %}border-red-500{% endif %}">
-                    {% if errors.new_supplier_name %}
-                    <p class="text-red-500 text-sm mt-1">{{ errors.new_supplier_name }}</p>
-                    {% endif %}
+                <div id="newSupplierDiv" class="{% if not (form_data and form_data.supplier_id == -1) %}hidden{% endif %} space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">New Supplier Name *</label>
+                        <input type="text" name="new_supplier_name" id="newSupplierNameInput" value="{{ form_data.new_supplier_name if form_data else '' }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.new_supplier_name %}border-red-500{% endif %}">
+                        {% if errors.new_supplier_name %}
+                        <p class="text-red-500 text-sm mt-1">{{ errors.new_supplier_name }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+                            <input type="email" name="new_supplier_email" id="newSupplierEmailInput" value="{{ form_data.new_supplier_email if form_data else '' }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.new_supplier_email %}border-red-500{% endif %}">
+                            {% if errors.new_supplier_email %}
+                            <p class="text-red-500 text-sm mt-1">{{ errors.new_supplier_email }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+                            <input type="text" name="new_supplier_phone" id="newSupplierPhoneInput" value="{{ form_data.new_supplier_phone if form_data else '' }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.new_supplier_phone %}border-red-500{% endif %}">
+                            {% if errors.new_supplier_phone %}
+                            <p class="text-red-500 text-sm mt-1">{{ errors.new_supplier_phone }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div id="supplierSimilarWarning" class="hidden mt-2 bg-amber-50 border border-amber-300 rounded-lg p-3">
+                        <div class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-amber-800">Similar suppliers already exist:</p>
+                                <ul id="supplierSimilarList" class="mt-1 text-sm text-amber-700 space-y-1"></ul>
+                            </div>
+                            <button type="button" onclick="hideSupplierSimilar()" class="text-amber-400 hover:text-amber-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -62,11 +151,12 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Amount (EUR) *</label>
                     <div class="relative">
-                        <span class="absolute left-3 top-2 text-gray-500">&euro;</span>
+                        <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none">&euro;</span>
                         <input type="number" name="invoice_amount" step="0.01" min="0.01" required
                             value="{{ '%.2f'|format(invoice.invoice_amount) if invoice else (form_data.invoice_amount if form_data else '') }}"
                             onchange="copyToPayment()"
-                            class="w-full pl-8 rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.invoice_amount %}border-red-500{% endif %}">
+                            style="padding-left: 1.75rem;"
+                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.invoice_amount %}border-red-500{% endif %}">
                     </div>
                     {% if errors.invoice_amount %}
                     <p class="text-red-500 text-sm mt-1">{{ errors.invoice_amount }}</p>
@@ -75,10 +165,11 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Payment Amount (EUR) *</label>
                     <div class="relative">
-                        <span class="absolute left-3 top-2 text-gray-500">&euro;</span>
+                        <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none">&euro;</span>
                         <input type="number" name="payment_amount" id="paymentAmount" step="0.01" min="0.01" required
                             value="{{ '%.2f'|format(invoice.payment_amount) if invoice else (form_data.payment_amount if form_data else '') }}"
-                            class="w-full pl-8 rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.payment_amount %}border-red-500{% endif %}">
+                            style="padding-left: 1.75rem;"
+                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.payment_amount %}border-red-500{% endif %}">
                     </div>
                     {% if errors.payment_amount %}
                     <p class="text-red-500 text-sm mt-1">{{ errors.payment_amount }}</p>
@@ -101,6 +192,9 @@
                         </option>
                         {% endfor %}
                     </select>
+                    {% if errors.method_request %}
+                    <p class="text-red-500 text-sm mt-1">{{ errors.method_request }}</p>
+                    {% endif %}
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Procurement Method *</label>
@@ -111,6 +205,9 @@
                         </option>
                         {% endfor %}
                     </select>
+                    {% if errors.method_procurement %}
+                    <p class="text-red-500 text-sm mt-1">{{ errors.method_procurement }}</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -130,7 +227,7 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Date *</label>
                         <input type="date" name="invoice_date" required
-                            value="{{ invoice.invoice_date.strftime('%Y-%m-%d') if invoice and invoice.invoice_date else (form_data.invoice_date if form_data else '') }}"
+                            value="{{ invoice.invoice_date|format_date('%Y-%m-%d') if invoice and invoice.invoice_date else (form_data.invoice_date if form_data else '') }}"
                             max="{{ today if today else '' }}"
                             class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.invoice_date %}border-red-500{% endif %}">
                         {% if errors.invoice_date %}
@@ -174,6 +271,23 @@
             </div>
         </div>
 
+        <!-- Fiscal Receipt (optional) -->
+        <div class="border-b pb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Fiscal Receipt (optional)</h3>
+            <div class="space-y-2">
+                {% if is_edit and invoice.fiscal_receipt_path %}
+                <p class="text-sm text-gray-700">
+                    Current: <a href="/invoices/{{ invoice.id }}/fiscal-receipt" class="text-malta-blue hover:underline" target="_blank" rel="noopener">View / download</a>
+                </p>
+                {% endif %}
+                <input type="file" name="fiscal_receipt" accept=".pdf,.jpg,.jpeg,.png" class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-malta-blue file:text-white hover:file:bg-malta-blue-dark">
+                {% if errors.fiscal_receipt %}
+                <p class="text-red-500 text-sm">{{ errors.fiscal_receipt }}</p>
+                {% endif %}
+                <p class="text-xs text-gray-500">Optional. Max 10MB. Allowed: PDF, JPG, PNG.</p>
+            </div>
+        </div>
+
         <!-- Approval Section -->
         <div class="{% if invoice and invoice.is_approved %}bg-green-50 -mx-6 -mb-6 p-6 rounded-b-lg{% endif %}">
             <h3 class="text-lg font-medium text-gray-900 mb-4">
@@ -186,18 +300,12 @@
             </h3>
 
             {% if invoice and invoice.is_approved %}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="mb-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">TF Number</label>
-                    <p class="text-lg font-bold text-malta-blue">{{ invoice.tf_number }}</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Proposer Councillor</label>
-                    <input type="text" name="proposer_councillor" value="{{ invoice.proposer_councillor }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Seconder Councillor</label>
-                    <input type="text" name="seconder_councillor" value="{{ invoice.seconder_councillor }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        {% if invoice.chq_number %}CHQ Number{% else %}TF Number{% endif %}
+                    </label>
+                    <p class="text-lg font-bold {% if invoice.chq_number %}text-amber-600{% else %}text-malta-blue{% endif %}">{{ invoice.chq_number or invoice.tf_number }}</p>
                 </div>
             </div>
             <!-- Unapprove Button -->
@@ -208,38 +316,43 @@
                 </button>
             </div>
             <input type="hidden" name="is_approved" value="true">
+            <input type="hidden" name="number_type" value="{{ invoice.number_type or 'TF' }}">
             {% else %}
             <div class="space-y-4">
                 <div class="flex items-center">
                     <input type="checkbox" name="is_approved" id="approveCheckbox" value="true" onchange="toggleApprovalFields()"
                         class="h-4 w-4 text-malta-blue focus:ring-malta-blue border-gray-300 rounded">
                     <label for="approveCheckbox" class="ml-2 text-sm text-gray-700">
-                        Approve this invoice (TF number will be assigned automatically)
+                        Approve this invoice
                     </label>
                 </div>
-                <p class="text-sm text-gray-500">
-                    Next TF number: <strong class="text-malta-blue">{{ next_tf_number }}</strong>
-                </p>
-                <div id="approvalFields" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 bg-green-50 rounded-lg">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Proposer Councillor *</label>
-                        <input type="text" name="proposer_councillor" id="proposerInput"
-                            value="{{ form_data.proposer_councillor if form_data else '' }}"
-                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.proposer_councillor %}border-red-500{% endif %}">
-                        {% if errors.proposer_councillor %}
-                        <p class="text-red-500 text-sm mt-1">{{ errors.proposer_councillor }}</p>
-                        {% endif %}
+
+                <!-- Number Type Selection (TF or CHQ) -->
+                <div id="numberTypeSelection" class="hidden">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Select approval type:</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- TF Option -->
+                        <label class="relative flex items-start p-4 border-2 rounded-lg cursor-pointer hover:bg-blue-50 transition border-malta-blue bg-blue-50" id="tfOptionLabel">
+                            <input type="radio" name="number_type" value="TF" class="h-4 w-4 text-malta-blue focus:ring-malta-blue border-gray-300 mt-0.5" id="tfRadio" checked onchange="updateNumberTypeDisplay()">
+                            <div class="ml-3">
+                                <span class="block text-sm font-medium text-gray-900">TF Number (Transfer of Funds)</span>
+                                <span class="block text-sm text-gray-500">Next: <strong class="text-malta-blue">{{ next_tf_number }}</strong></span>
+                            </div>
+                        </label>
+                        <!-- CHQ Option -->
+                        <label class="relative flex items-start p-4 border-2 rounded-lg cursor-pointer hover:bg-amber-50 transition border-gray-300" id="chqOptionLabel">
+                            <input type="radio" name="number_type" value="CHQ" class="h-4 w-4 text-amber-600 focus:ring-amber-600 border-gray-300 mt-0.5" id="chqRadio" onchange="updateNumberTypeDisplay()">
+                            <div class="ml-3">
+                                <span class="block text-sm font-medium text-gray-900">CHQ Number (Cheque)</span>
+                                <span class="block text-sm text-gray-500">Next: <strong class="text-amber-600">{{ next_chq_number }}</strong></span>
+                            </div>
+                        </label>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Seconder Councillor *</label>
-                        <input type="text" name="seconder_councillor" id="seconderInput"
-                            value="{{ form_data.seconder_councillor if form_data else '' }}"
-                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue {% if errors.seconder_councillor %}border-red-500{% endif %}">
-                        {% if errors.seconder_councillor %}
-                        <p class="text-red-500 text-sm mt-1">{{ errors.seconder_councillor }}</p>
-                        {% endif %}
-                    </div>
+                    {% if errors.number_type %}
+                    <p class="text-red-500 text-sm mt-2">{{ errors.number_type }}</p>
+                    {% endif %}
                 </div>
+
             </div>
             {% endif %}
         </div>
@@ -249,7 +362,7 @@
             <a href="/invoices" class="px-6 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
                 Cancel
             </a>
-            <button type="submit" class="px-6 py-2 text-white bg-malta-blue rounded-lg hover:bg-malta-blue-dark transition">
+            <button type="submit" id="submitBtn" class="px-6 py-2 text-white bg-malta-blue rounded-lg hover:bg-malta-blue-dark transition disabled:opacity-50 disabled:cursor-not-allowed">
                 {% if is_edit %}Update Invoice{% else %}Create Invoice{% endif %}
             </button>
         </div>
@@ -259,14 +372,164 @@
 
 {% block scripts %}
 <script>
-function toggleNewSupplier() {
-    const select = document.getElementById('supplierSelect');
-    const newSupplierDiv = document.getElementById('newSupplierDiv');
-    if (select.value === '-1') {
-        newSupplierDiv.classList.remove('hidden');
+// Supplier dropdown elements
+const supplierDropdownBtn = document.getElementById('supplierDropdownBtn');
+const supplierDropdownPanel = document.getElementById('supplierDropdownPanel');
+const supplierSearchInput = document.getElementById('supplierSearchInput');
+const supplierIdInput = document.getElementById('supplierIdInput');
+const supplierSelectedText = document.getElementById('supplierSelectedText');
+const supplierList = document.getElementById('supplierList');
+const addNewSupplierOption = document.getElementById('addNewSupplierOption');
+const noResultsMsg = document.getElementById('noResultsMsg');
+const newSupplierDiv = document.getElementById('newSupplierDiv');
+const newSupplierNameInput = document.getElementById('newSupplierNameInput');
+
+let isDropdownOpen = false;
+
+function openDropdown() {
+    supplierDropdownPanel.classList.remove('hidden');
+    isDropdownOpen = true;
+    supplierSearchInput.focus();
+    supplierSearchInput.value = '';
+    filterSuppliers('');
+}
+
+function closeDropdown() {
+    supplierDropdownPanel.classList.add('hidden');
+    isDropdownOpen = false;
+}
+
+function toggleDropdown() {
+    if (isDropdownOpen) {
+        closeDropdown();
     } else {
+        openDropdown();
+    }
+}
+
+function selectSupplier(value, text) {
+    supplierIdInput.value = value;
+
+    if (value === '-1') {
+        supplierSelectedText.innerHTML = '<span class="text-malta-blue font-medium">+ Add New Supplier</span>';
+        newSupplierDiv.classList.remove('hidden');
+        setTimeout(() => newSupplierNameInput.focus(), 100);
+    } else {
+        supplierSelectedText.textContent = text;
         newSupplierDiv.classList.add('hidden');
     }
+
+    // Update selection highlight
+    document.querySelectorAll('.supplier-option').forEach(opt => {
+        opt.classList.remove('bg-malta-blue', 'text-white');
+        opt.classList.add('hover:bg-gray-100');
+    });
+    const selectedOpt = document.querySelector(`.supplier-option[data-value="${value}"]`);
+    if (selectedOpt) {
+        selectedOpt.classList.add('bg-malta-blue', 'text-white');
+        selectedOpt.classList.remove('hover:bg-gray-100');
+    }
+
+    closeDropdown();
+}
+
+function filterSuppliers(query) {
+    const lowerQuery = query.toLowerCase();
+    let visibleCount = 0;
+
+    document.querySelectorAll('.supplier-option').forEach(opt => {
+        const name = opt.getAttribute('data-name');
+        if (name.includes(lowerQuery)) {
+            opt.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            opt.classList.add('hidden');
+        }
+    });
+
+    // Show/hide no results message
+    if (visibleCount === 0 && query.trim() !== '') {
+        noResultsMsg.classList.remove('hidden');
+    } else {
+        noResultsMsg.classList.add('hidden');
+    }
+}
+
+// Event listeners
+supplierDropdownBtn.addEventListener('click', toggleDropdown);
+
+supplierSearchInput.addEventListener('input', (e) => {
+    filterSuppliers(e.target.value);
+});
+
+supplierSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeDropdown();
+        supplierDropdownBtn.focus();
+    }
+});
+
+addNewSupplierOption.addEventListener('click', () => {
+    selectSupplier('-1', '+ Add New Supplier');
+});
+
+document.querySelectorAll('.supplier-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+        selectSupplier(opt.getAttribute('data-value'), opt.textContent.trim());
+    });
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (!document.getElementById('supplierDropdown').contains(e.target)) {
+        closeDropdown();
+    }
+});
+
+// --- Fuzzy duplicate warning for new supplier ---
+let supplierDebounce = null;
+function checkSupplierSimilar(name) {
+    if (!name || name.length < 2) {
+        hideSupplierSimilar();
+        return;
+    }
+    const url = '/suppliers/api/check-similar?name=' + encodeURIComponent(name);
+    fetch(url)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            if (!data || !data.similar || data.similar.length === 0) {
+                hideSupplierSimilar();
+                return;
+            }
+            const list = document.getElementById('supplierSimilarList');
+            list.innerHTML = data.similar.map(m => {
+                const pct = Math.round(m.confidence * 100);
+                const badge = pct >= 80 ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800';
+                return `<li><span class="font-medium">${escapeHtml(m.supplier_name)}</span>
+                    <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${badge}">${pct}% match</span></li>`;
+            }).join('');
+            document.getElementById('supplierSimilarWarning').classList.remove('hidden');
+        })
+        .catch(() => hideSupplierSimilar());
+}
+
+function hideSupplierSimilar() {
+    const el = document.getElementById('supplierSimilarWarning');
+    if (el) el.classList.add('hidden');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+const newSupplierInput = document.getElementById('newSupplierNameInput');
+if (newSupplierInput) {
+    newSupplierInput.addEventListener('input', () => {
+        clearTimeout(supplierDebounce);
+        supplierDebounce = setTimeout(() => checkSupplierSimilar(newSupplierInput.value.trim()), 400);
+    });
 }
 
 function copyToPayment() {
@@ -279,26 +542,37 @@ function copyToPayment() {
 
 function toggleApprovalFields() {
     const checkbox = document.getElementById('approveCheckbox');
-    const fields = document.getElementById('approvalFields');
-    const proposerInput = document.getElementById('proposerInput');
-    const seconderInput = document.getElementById('seconderInput');
+    const numberTypeSelection = document.getElementById('numberTypeSelection');
 
     if (checkbox.checked) {
-        fields.classList.remove('hidden');
-        fields.classList.add('grid');
-        proposerInput.required = true;
-        seconderInput.required = true;
+        numberTypeSelection.classList.remove('hidden');
     } else {
-        fields.classList.add('hidden');
-        fields.classList.remove('grid');
-        proposerInput.required = false;
-        seconderInput.required = false;
+        numberTypeSelection.classList.add('hidden');
+    }
+}
+
+function updateNumberTypeDisplay() {
+    const tfRadio = document.getElementById('tfRadio');
+    const chqRadio = document.getElementById('chqRadio');
+    const tfLabel = document.getElementById('tfOptionLabel');
+    const chqLabel = document.getElementById('chqOptionLabel');
+
+    if (tfRadio.checked) {
+        tfLabel.classList.add('border-malta-blue', 'bg-blue-50');
+        tfLabel.classList.remove('border-gray-300');
+        chqLabel.classList.remove('border-amber-500', 'bg-amber-50');
+        chqLabel.classList.add('border-gray-300');
+    } else {
+        chqLabel.classList.add('border-amber-500', 'bg-amber-50');
+        chqLabel.classList.remove('border-gray-300');
+        tfLabel.classList.remove('border-malta-blue', 'bg-blue-50');
+        tfLabel.classList.add('border-gray-300');
     }
 }
 
 // Unapprove confirmation
 function confirmUnapprove() {
-    if (confirm('Are you sure you want to unapprove this invoice?\n\nThis will:\n- Remove the TF number\n- Clear the approval status\n- Allow you to edit and re-approve later\n\nContinue?')) {
+    if (confirm('Are you sure you want to unapprove this invoice?\n\nThis will:\n- Keep the existing TF/CHQ number\n- Clear the approval status\n- Allow you to edit and re-approve later\n\nContinue?')) {
         // Submit unapprove form
         const form = document.createElement('form');
         form.method = 'POST';
@@ -315,19 +589,26 @@ document.addEventListener('keydown', function(e) {
         e.preventDefault();
         document.querySelector('form').submit();
     }
-    // Escape to go back
-    if (e.key === 'Escape') {
+    // Escape to go back (but not if dropdown is open)
+    if (e.key === 'Escape' && !isDropdownOpen) {
         window.location.href = '/invoices';
     }
 });
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    toggleNewSupplier();
+    // Initialize new supplier div visibility
+    if (supplierIdInput.value === '-1') {
+        newSupplierDiv.classList.remove('hidden');
+    }
+
     {% if form_data and form_data.is_approved %}
     document.getElementById('approveCheckbox').checked = true;
     toggleApprovalFields();
     {% endif %}
+
+    // Double-click prevention is handled globally by base.html and app.js
+    // No additional handler needed here
 });
 </script>
 {% endblock %}
