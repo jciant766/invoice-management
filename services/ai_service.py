@@ -6,17 +6,27 @@ Extracts structured invoice data from email conversations and attachments.
 
 import os
 import json
+import asyncio
+import logging
 import httpx
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from dotenv import load_dotenv
 from .attachment_utils import prepare_attachments_for_vision
 
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-pro-preview-03-25")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-5.2")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Retry configuration
+MAX_RETRIES = 3
+INITIAL_BACKOFF = 1.0  # seconds
+MAX_BACKOFF = 30.0  # seconds
+BACKOFF_MULTIPLIER = 2.0
 
 
 # System prompt for invoice extraction
@@ -27,10 +37,11 @@ Your task is to analyze:
 2. Any PDF or image attachments provided (which may contain the actual invoice)
 3. Previous email threads in the conversation
 
+IMPORTANT: When multiple attachments are provided, you MUST identify which attachment is the actual invoice/fiscal receipt document. This could be labeled as "Image 1", "Image 2", etc. in the attachments.
+
 Extract invoice/payment details from all available sources. The council uses specific codes for categorization.
 
 METHOD REQUEST CODES:
-- P: Part Payment
 - Inv: Invoice
 - Rec: Receipt
 - RFP: Request for Payment
@@ -57,7 +68,8 @@ Extract the following information and return as JSON:
     "invoice_number": "Invoice number from the document",
     "po_number": "Purchase order number if mentioned, or null",
     "confidence_score": 0.95,
-    "notes": "Any additional notes or uncertainties"
+    "notes": "Any additional notes or uncertainties",
+    "invoice_attachment_index": 0
 }
 
 IMPORTANT RULES:
@@ -69,6 +81,7 @@ IMPORTANT RULES:
 6. Amounts should be numbers without currency symbols
 7. confidence_score should reflect how certain you are about the extraction (0.0 to 1.0)
 8. The supplier_name should be clean and standardized (company name only, no addresses)
+9. invoice_attachment_index: Set this to the 0-based index of the attachment that IS the invoice/receipt document. If Image 1 is the invoice, set to 0. If Image 2 is the invoice, set to 1. If no attachments contain an invoice, set to null.
 
 Return ONLY the JSON object, no additional text or markdown formatting."""
 
@@ -87,17 +100,27 @@ async def parse_invoice_email(email_content: str, email_subject: str = "", email
         Dictionary with extracted invoice data or None if parsing fails
     """
     if not OPENROUTER_API_KEY:
-        print("OpenRouter API key not configured")
+        logger.error("OpenRouter API key not configured")
         return None
 
     # Process attachments for vision API
     processed_attachments = []
+    attachment_errors = []
     if attachments:
-        processed_attachments = prepare_attachments_for_vision(attachments)
-        print(f"Processed {len(processed_attachments)} attachment(s) for vision API")
+        processed_attachments, attachment_errors = prepare_attachments_for_vision(attachments)
+        logger.info(f"Processed {len(processed_attachments)} attachment(s) for vision API")
+        if attachment_errors:
+            for err in attachment_errors:
+                logger.warning(f"Attachment warning: {err}")
 
     # Build user message content
     if processed_attachments:
+        # Build attachment list description for AI
+        attachment_list = "\n".join([
+            f"- Image {i+1}: {att.get('filename', 'unknown')}"
+            for i, att in enumerate(processed_attachments)
+        ])
+
         # Vision API format with images
         user_content = [
             {
@@ -110,12 +133,20 @@ FROM: {email_from}
 EMAIL CONTENT:
 {email_content}
 
-The attached images may contain the invoice. Analyze both the email text and images to extract invoice details. Return as JSON."""
+ATTACHMENTS ({len(processed_attachments)} files):
+{attachment_list}
+
+The images below are labeled in order (Image 1, Image 2, etc.). Identify which image is the actual invoice/fiscal receipt document and set invoice_attachment_index accordingly. Return as JSON."""
             }
         ]
 
-        # Add images
-        for attachment in processed_attachments:
+        # Add images with labels
+        for i, attachment in enumerate(processed_attachments):
+            # Add text label before each image
+            user_content.append({
+                "type": "text",
+                "text": f"Image {i+1} ({attachment.get('filename', 'attachment')}):"
+            })
             user_content.append({
                 "type": "image_url",
                 "image_url": {
@@ -134,82 +165,114 @@ EMAIL CONTENT:
 
 Extract the invoice details and return as JSON."""
 
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                OPENROUTER_URL,
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://council-invoice-system.local",
-                    "X-Title": "Council Invoice System"
-                },
-                json={
-                    "model": OPENROUTER_MODEL,
-                    "messages": [
-                        {"role": "system", "content": INVOICE_EXTRACTION_PROMPT},
-                        {"role": "user", "content": user_content}
-                    ],
-                    "temperature": 0.1,  # Low temperature for consistent extraction
-                    "max_tokens": 1000
-                }
-            )
+    last_exception = None
+    backoff = INITIAL_BACKOFF
 
-            if response.status_code != 200:
-                print(f"OpenRouter API error: {response.status_code} - {response.text}")
-                error_text = response.text.lower()
-                if response.status_code == 402 or "credits" in error_text:
-                    raise Exception("OUT_OF_CREDITS")
-                elif response.status_code == 401:
-                    raise Exception("INVALID_API_KEY")
-                elif response.status_code == 429:
-                    raise Exception("RATE_LIMITED")
-                elif "thinking_budget" in error_text:
-                    # Google Gemini models don't support thinking_budget parameter
-                    raise Exception("MODEL_NOT_SUPPORTED: Try using a different model like Claude or GPT")
-                return None
+    for attempt in range(MAX_RETRIES):
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    OPENROUTER_URL,
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://council-invoice-system.local",
+                        "X-Title": "Council Invoice System"
+                    },
+                    json={
+                        "model": OPENROUTER_MODEL,
+                        "messages": [
+                            {"role": "system", "content": INVOICE_EXTRACTION_PROMPT},
+                            {"role": "user", "content": user_content}
+                        ],
+                        "temperature": 0.1,  # Low temperature for consistent extraction
+                        "max_tokens": 1000
+                    }
+                )
 
-            result = response.json()
-            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                if response.status_code != 200:
+                    logger.error(f"OpenRouter API error: {response.status_code} - {response.text}")
+                    error_text = response.text.lower()
 
-            # Parse the JSON response
-            # Clean up potential markdown formatting
-            content = content.strip()
-            if content.startswith("```json"):
-                content = content[7:]
-            if content.startswith("```"):
-                content = content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-            content = content.strip()
+                    # Non-retryable errors - fail immediately
+                    if response.status_code == 402 or "credits" in error_text:
+                        raise Exception("OUT_OF_CREDITS")
+                    elif response.status_code == 401:
+                        raise Exception("INVALID_API_KEY")
+                    elif "thinking_budget" in error_text:
+                        raise Exception("MODEL_NOT_SUPPORTED: Try using a different model like Claude or GPT")
 
-            # Try to parse JSON with better error handling
-            try:
-                invoice_data = json.loads(content)
-            except json.JSONDecodeError as e:
-                print(f"Failed to parse AI response as JSON: {e}")
-                print(f"Raw AI response: {content[:200]}...")  # Print first 200 chars
-                # Return a structured error instead of None
-                raise Exception(f"AI_PARSE_ERROR: {str(e)}")
+                    # Retryable errors - 429 (rate limit) or 5xx (server errors)
+                    if response.status_code == 429 or response.status_code >= 500:
+                        if attempt < MAX_RETRIES - 1:
+                            logger.warning(f"Retrying in {backoff:.1f}s (attempt {attempt + 1}/{MAX_RETRIES})")
+                            await asyncio.sleep(backoff)
+                            backoff = min(backoff * BACKOFF_MULTIPLIER, MAX_BACKOFF)
+                            continue
+                        raise Exception("RATE_LIMITED" if response.status_code == 429 else "AI_SERVICE_ERROR: Server error after retries")
 
-            # Validate and normalize the data
-            invoice_data = normalize_invoice_data(invoice_data)
+                    return None
 
-            return invoice_data
+                result = response.json()
+                content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
 
-    except json.JSONDecodeError as e:
-        print(f"Failed to parse AI response as JSON: {e}")
-        raise Exception(f"AI_PARSE_ERROR: {str(e)}")
-    except httpx.TimeoutException:
-        print("OpenRouter API request timed out")
-        raise Exception("TIMEOUT: AI request timed out. Please try again.")
-    except Exception as e:
-        # Re-raise exceptions that should be handled by the route
-        error_str = str(e)
-        if any(err in error_str for err in ["AI_PARSE_ERROR", "OUT_OF_CREDITS", "INVALID_API_KEY", "RATE_LIMITED", "MODEL_NOT_SUPPORTED", "TIMEOUT"]):
-            raise  # Let the route handle these specific errors
-        print(f"Error calling OpenRouter API: {e}")
-        raise Exception(f"AI_SERVICE_ERROR: {str(e)}")
+                # Parse the JSON response
+                # Clean up potential markdown formatting
+                content = content.strip()
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.startswith("```"):
+                    content = content[3:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                content = content.strip()
+
+                # Try to parse JSON with better error handling
+                try:
+                    invoice_data = json.loads(content)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse AI response as JSON: {e}")
+                    logger.debug(f"Raw AI response: {content[:200]}...")
+                    # Return a structured error instead of None
+                    raise Exception(f"AI_PARSE_ERROR: {str(e)}")
+
+                # Validate and normalize the data
+                invoice_data = normalize_invoice_data(invoice_data)
+
+                # Include original attachments for saving the identified invoice
+                if attachments:
+                    invoice_data['_attachments'] = attachments  # Original attachment data with binary
+                    invoice_data['_attachment_count'] = len(attachments)
+
+                # Include any attachment processing warnings
+                if attachment_errors:
+                    invoice_data['_attachment_warnings'] = attachment_errors
+
+                return invoice_data
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response as JSON: {e}")
+            raise Exception(f"AI_PARSE_ERROR: {str(e)}")
+        except httpx.TimeoutException:
+            last_exception = Exception("TIMEOUT: AI request timed out. Please try again.")
+            if attempt < MAX_RETRIES - 1:
+                logger.warning(f"Request timed out, retrying in {backoff:.1f}s (attempt {attempt + 1}/{MAX_RETRIES})")
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * BACKOFF_MULTIPLIER, MAX_BACKOFF)
+                continue
+            raise last_exception
+        except Exception as e:
+            # Re-raise exceptions that should be handled by the route
+            error_str = str(e)
+            if any(err in error_str for err in ["AI_PARSE_ERROR", "OUT_OF_CREDITS", "INVALID_API_KEY", "RATE_LIMITED", "MODEL_NOT_SUPPORTED", "TIMEOUT"]):
+                raise  # Let the route handle these specific errors
+            logger.error(f"Error calling OpenRouter API: {e}")
+            raise Exception(f"AI_SERVICE_ERROR: {str(e)}")
+
+    # Should not reach here, but just in case
+    if last_exception:
+        raise last_exception
+    raise Exception("AI_SERVICE_ERROR: Max retries exceeded")
 
 
 def normalize_invoice_data(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -223,7 +286,7 @@ def normalize_invoice_data(data: Dict[str, Any]) -> Dict[str, Any]:
         Normalized invoice data
     """
     # Valid codes
-    valid_method_request = ['P', 'Inv', 'Rec', 'RFP', 'PP', 'DP', 'EC']
+    valid_method_request = ['Inv', 'Rec', 'RFP', 'PP', 'DP', 'EC']
     valid_method_procurement = ['DA', 'D', 'T', 'K', 'R']
 
     # Normalize method_request
@@ -286,6 +349,16 @@ def normalize_invoice_data(data: Dict[str, Any]) -> Dict[str, Any]:
         data['confidence_score'] = float(data.get('confidence_score', 0.5))
     except (ValueError, TypeError):
         data['confidence_score'] = 0.5
+
+    # Invoice attachment index (which attachment is the invoice)
+    invoice_idx = data.get('invoice_attachment_index')
+    if invoice_idx is not None:
+        try:
+            data['invoice_attachment_index'] = int(invoice_idx)
+        except (ValueError, TypeError):
+            data['invoice_attachment_index'] = None
+    else:
+        data['invoice_attachment_index'] = None
 
     return data
 

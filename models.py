@@ -1,107 +1,11 @@
-from sqlalchemy import Column, Integer, String, Text, Numeric, Date, Boolean, DateTime, ForeignKey, CheckConstraint
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from database import Base
-
-
-class Supplier(Base):
-    __tablename__ = "suppliers"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    name = Column(String(255), nullable=False, unique=True)
-    contact_email = Column(String(255), nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, server_default=func.now())
-
-    invoices = relationship("Invoice", back_populates="supplier")
-
-    def __repr__(self):
-        return f"<Supplier(id={self.id}, name='{self.name}')>"
-
-
-class Invoice(Base):
-    __tablename__ = "invoices"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-
-    # Core invoice data
-    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
-    invoice_amount = Column(Numeric(10, 2), nullable=False)
-    payment_amount = Column(Numeric(10, 2), nullable=False)
-
-    # Method classifications
-    method_request = Column(
-        String(10),
-        nullable=False,
-        info={'check': "method_request IN ('P', 'Inv', 'Rec', 'RFP', 'PP', 'DP', 'EC')"}
-    )
-    method_procurement = Column(
-        String(10),
-        nullable=False,
-        info={'check': "method_procurement IN ('DA', 'D', 'T', 'K', 'R')"}
-    )
-
-    # Invoice details
-    description = Column(Text, nullable=False)
-    invoice_date = Column(Date, nullable=False)
-    invoice_number = Column(String(100), nullable=False)
-
-    # Reference numbers
-    po_number = Column(String(100), nullable=True)  # Purchase Order (optional)
-    pjv_number = Column(String(100), nullable=False, unique=True)  # Purchase Journal Voucher (required)
-    tf_number = Column(String(100), nullable=True)  # Transfer of Funds (only after approval)
-
-    # Approval tracking
-    is_approved = Column(Boolean, default=False)
-    approved_date = Column(Date, nullable=True)
-    proposer_councillor = Column(String(255), nullable=True)
-    seconder_councillor = Column(String(255), nullable=True)
-
-    # Timestamps
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-
-    # Soft delete
-    is_deleted = Column(Boolean, default=False)
-
-    # Fiscal receipt attachment
-    fiscal_receipt_path = Column(String(500), nullable=True)
-
-    # Email source tracking (for AI-created invoices)
-    source_email_id = Column(String(255), nullable=True)
-    is_ai_generated = Column(Boolean, default=False)
-
-    # Relationships
-    supplier = relationship("Supplier", back_populates="invoices")
-
-    __table_args__ = (
-        CheckConstraint(
-            "method_request IN ('P', 'Inv', 'Rec', 'RFP', 'PP', 'DP', 'EC')",
-            name='check_method_request'
-        ),
-        CheckConstraint(
-            "method_procurement IN ('DA', 'D', 'T', 'K', 'R')",
-            name='check_method_procurement'
-        ),
-    )
-
-    def __repr__(self):
-        return f"<Invoice(id={self.id}, pjv='{self.pjv_number}', tf='{self.tf_number}')>"
-
-
-class Setting(Base):
-    __tablename__ = "settings"
-
-    key = Column(String(100), primary_key=True)
-    value = Column(Text, nullable=False)
-
-    def __repr__(self):
-        return f"<Setting(key='{self.key}', value='{self.value}')>"
-
+"""
+Data Models and Constants
+=========================
+Simple constants and helpers - no ORM needed.
+"""
 
 # Method code descriptions for display
 METHOD_REQUEST_CODES = {
-    'P': 'Part Payment',
     'Inv': 'Invoice',
     'Rec': 'Receipt',
     'RFP': 'Request for Payment',
@@ -118,3 +22,54 @@ METHOD_PROCUREMENT_CODES = {
     'R': 'Refund'
 }
 
+
+# Audit action constants
+class AuditAction:
+    # Authentication
+    LOGIN = "login"
+    LOGOUT = "logout"
+    LOGIN_FAILED = "login_failed"
+
+    # Invoice actions
+    INVOICE_CREATE = "invoice_create"
+    INVOICE_UPDATE = "invoice_update"
+    INVOICE_DELETE = "invoice_delete"
+    INVOICE_STATUS = "invoice_status"
+    INVOICE_RESTORE = "invoice_restore"
+
+    # Export actions
+    EXPORT = "export"
+    EXPORT_PDF = "export_pdf"
+    EXPORT_EXCEL = "export_excel"
+    EXPORT_CSV = "export_csv"
+
+    # User management
+    USER_CREATE = "user_create"
+    USER_UPDATE = "user_update"
+    USER_DELETE = "user_delete"
+    PASSWORD_CHANGE = "password_change"
+
+    # Supplier actions
+    SUPPLIER_CREATE = "supplier_create"
+    SUPPLIER_UPDATE = "supplier_update"
+    SUPPLIER_DELETE = "supplier_delete"
+
+    # Settings
+    SETTINGS_CHANGE = "settings_change"
+
+    # Email
+    EMAIL_CONNECT = "email_connect"
+    EMAIL_DISCONNECT = "email_disconnect"
+    EMAIL_FOLDER_SELECT = "email_folder_select"
+
+
+def row_to_dict(row):
+    """Convert a sqlite3.Row to a dictionary."""
+    if row is None:
+        return None
+    return dict(row)
+
+
+def rows_to_dicts(rows):
+    """Convert a list of sqlite3.Row to list of dictionaries."""
+    return [dict(row) for row in rows]

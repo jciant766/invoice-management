@@ -4,6 +4,28 @@
 
 {% block content %}
 <div class="space-y-6">
+    <!-- Success/Error Messages -->
+    {% if request.query_params.get('success') %}
+    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg flex justify-between items-center" role="alert">
+        <span>{{ request.query_params.get('success').replace('+', ' ') }}</span>
+        <button onclick="this.parentElement.remove()" class="text-green-700 hover:text-green-900">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+    {% endif %}
+    {% if request.query_params.get('error') %}
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg flex justify-between items-center" role="alert">
+        <span>{{ request.query_params.get('error').replace('+', ' ') }}</span>
+        <button onclick="this.parentElement.remove()" class="text-red-700 hover:text-red-900">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+    {% endif %}
+
     <!-- Page Header -->
     <div class="flex justify-between items-center flex-wrap gap-4">
         <h2 class="text-2xl font-bold text-gray-800">Invoice List</h2>
@@ -20,6 +42,43 @@
         </div>
     </div>
 
+    <!-- Quick Search -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <form method="GET" class="flex gap-4 items-center">
+            <!-- Preserve other filters -->
+            <input type="hidden" name="status" value="{{ filters.status }}">
+            <input type="hidden" name="sort_by" value="{{ filters.sort_by }}">
+            <input type="hidden" name="sort_order" value="{{ filters.sort_order }}">
+            {% if filters.supplier_id %}<input type="hidden" name="supplier_id" value="{{ filters.supplier_id }}">{% endif %}
+            {% if filters.date_from %}<input type="hidden" name="date_from" value="{{ filters.date_from }}">{% endif %}
+            {% if filters.date_to %}<input type="hidden" name="date_to" value="{{ filters.date_to }}">{% endif %}
+            {% if filters.include_void %}<input type="hidden" name="include_void" value="true">{% endif %}
+
+            <div class="flex-1 relative">
+                <svg class="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input type="text" name="q" id="quickSearch" value="{{ filters.q or '' }}" placeholder="Search by supplier, invoice #, TF/CHQ #, or PJV #..."
+                       class="w-full py-2 rounded-lg border border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue"
+                       style="padding-left: 2.5rem; padding-right: 2.5rem;">
+                {% if filters.q %}
+                <a href="/invoices?status={{ filters.status }}&sort_by={{ filters.sort_by }}&sort_order={{ filters.sort_order }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.supplier_id %}&supplier_id={{ filters.supplier_id }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}"
+                   class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </a>
+                {% endif %}
+            </div>
+            <button type="submit" class="bg-malta-blue text-white px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition">
+                Search
+            </button>
+            {% if filters.q %}
+            <span class="text-sm text-gray-500 whitespace-nowrap">{{ pagination.total_count }} result{% if pagination.total_count != 1 %}s{% endif %}</span>
+            {% endif %}
+        </form>
+    </div>
+
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow p-4">
         <form method="GET" action="/invoices" class="flex flex-wrap gap-4 items-end">
@@ -29,6 +88,7 @@
                     <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All</option>
                     <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Not Approved</option>
                     <option value="approved" {% if filters.status == 'approved' %}selected{% endif %}>Approved</option>
+                    <option value="voided" {% if filters.status == 'voided' %}selected{% endif %}>Voided</option>
                 </select>
             </div>
             <div class="flex-1 min-w-[150px] relative">
@@ -69,7 +129,7 @@
                             {% for supplier in suppliers %}
                             <div class="supplier-option px-3 py-2 cursor-pointer hover:bg-gray-100"
                                  data-name="{{ supplier.name }}"
-                                 onclick="selectSupplierFilter('{{ supplier.id }}', '{{ supplier.name | e }}')">
+                                 onclick="selectSupplierFilter({{ supplier.id|tojson|forceescape }}, {{ supplier.name|tojson|forceescape }})">
                                 {{ supplier.name }}
                             </div>
                             {% endfor %}
@@ -79,11 +139,15 @@
             </div>
             <div class="flex-1 min-w-[150px]">
                 <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-                <input type="date" name="date_from" value="{{ filters.date_from or '' }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                <input type="date" name="date_from" value="{{ filters.date_from or '' }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue px-3 py-2">
             </div>
             <div class="flex-1 min-w-[150px]">
                 <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-                <input type="date" name="date_to" value="{{ filters.date_to or '' }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                <input type="date" name="date_to" value="{{ filters.date_to or '' }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue px-3 py-2">
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" name="include_void" id="includeVoid" value="true" {% if filters.include_void %}checked{% endif %} class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                <label for="includeVoid" class="text-sm text-gray-700">Include voided</label>
             </div>
             <div class="flex gap-2">
                 <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">
@@ -102,6 +166,12 @@
             <!-- Bulk Actions -->
             <div class="flex gap-2 items-center">
                 <span class="text-sm text-gray-600">Selected: <strong id="selectedCount">0</strong></span>
+                <button onclick="printSelectedVouchers()" id="printSelectedBtn" disabled class="bg-malta-blue text-white px-3 py-1.5 rounded-lg hover:bg-malta-blue-dark transition disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5h20v5a2 2 0 01-2 2h-2m-8 0h4m-8 0v3h8v-3m-8 0h8" />
+                    </svg>
+                    Print Selected
+                </button>
                 <button onclick="bulkApprove()" id="bulkApproveBtn" disabled class="bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm">
                     Approve Selected
                 </button>
@@ -122,10 +192,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
-                    <div id="exportSelectedMenu" class="hidden absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg z-10 py-1">
+                    <div id="exportSelectedMenu" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg z-10 py-1">
                         <button onclick="exportSelected('csv')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">CSV</button>
                         <button onclick="exportSelected('excel')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Excel</button>
                         <button onclick="exportSelected('pdf')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">PDF</button>
+                        <button onclick="exportSelected('voucher')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Voucher PDF (1/page)</button>
                     </div>
                 </div>
 
@@ -140,9 +211,9 @@
                         </svg>
                     </button>
                     <div id="exportAllMenu" class="hidden absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg z-10 py-1">
-                        <a href="/export/csv?status={{ filters.status }}&supplier_id={{ filters.supplier_id or '' }}&date_from={{ filters.date_from or '' }}&date_to={{ filters.date_to or '' }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">CSV</a>
-                        <a href="/export/excel" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Excel</a>
-                        <a href="/export/pdf" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">PDF</a>
+                        <button type="button" onclick="openExportAllModal('csv')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">CSV</button>
+                        <button type="button" onclick="openExportAllModal('excel')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Excel</button>
+                        <button type="button" onclick="openExportAllModal('pdf')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">PDF</button>
                     </div>
                 </div>
             </div>
@@ -157,11 +228,11 @@
         </div>
         <div class="bg-white rounded-lg shadow p-4">
             <p class="text-sm text-gray-500">Total Invoice Amount</p>
-            <p class="text-2xl font-bold text-gray-800">&euro;{{ "%.2f"|format(totals.invoice_amount) }}</p>
+            <p class="text-2xl font-bold text-gray-800">&euro;{{ "{:,.2f}".format(totals.invoice_amount) }}</p>
         </div>
         <div class="bg-white rounded-lg shadow p-4">
             <p class="text-sm text-gray-500">Total Payment Amount</p>
-            <p class="text-2xl font-bold text-green-600">&euro;{{ "%.2f"|format(totals.payment_amount) }}</p>
+            <p class="text-2xl font-bold text-green-600">&euro;{{ "{:,.2f}".format(totals.payment_amount) }}</p>
         </div>
         <div class="bg-white rounded-lg shadow p-4">
             <p class="text-sm text-gray-500">Not Approved</p>
@@ -172,11 +243,24 @@
     <!-- Invoice Table -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200" id="invoicesTable">
+            <table class="min-w-[1100px] w-full table-fixed divide-y divide-gray-200" id="invoicesTable">
+                <colgroup>
+                    <col style="width:3%">
+                    <col style="width:17%">
+                    <col style="width:12%">
+                    <col style="width:8%">
+                    <col style="width:8%">
+                    <col style="width:7%">
+                    <col style="width:9%">
+                    <col style="width:9%">
+                    <col style="width:9%">
+                    <col style="width:8%">
+                    <col style="width:10%">
+                </colgroup>
                 <thead class="bg-gray-50">
                     <tr>
                         <th scope="col" class="px-3 py-3 text-center">
-                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="rounded border-gray-300 text-malta-blue focus:ring-malta-blue">
+                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="rounded border-gray-300 text-malta-blue focus:ring-malta-blue" aria-label="Select all invoices">
                         </th>
                         <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             <a href="?sort_by=supplier_id&sort_order={% if filters.sort_by == 'supplier_id' and filters.sort_order == 'asc' %}desc{% else %}asc{% endif %}&status={{ filters.status }}" class="hover:text-gray-700">
@@ -195,7 +279,12 @@
                         </th>
                         <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             <a href="?sort_by=invoice_date&sort_order={% if filters.sort_by == 'invoice_date' and filters.sort_order == 'asc' %}desc{% else %}asc{% endif %}&status={{ filters.status }}" class="hover:text-gray-700">
-                                Date
+                                Inv. Date
+                            </a>
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <a href="?sort_by=created_at&sort_order={% if filters.sort_by == 'created_at' and filters.sort_order == 'asc' %}desc{% else %}asc{% endif %}&status={{ filters.status }}" class="hover:text-gray-700 {% if filters.sort_by == 'created_at' %}text-malta-blue font-semibold{% endif %}">
+                                Created
                             </a>
                         </th>
                         <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -205,7 +294,7 @@
                             Status
                         </th>
                         <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            TF #
+                            TF / CHQ #
                         </th>
                         <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Receipt
@@ -217,93 +306,213 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for invoice in invoices %}
-                    <tr class="hover:bg-gray-50" data-invoice-id="{{ invoice.id }}" data-is-pending="{{ 'true' if not invoice.is_approved else 'false' }}">
+                    <tr class="hover:bg-gray-50 invoice-row" data-invoice-id="{{ invoice.id }}" data-is-pending="{{ 'true' if not invoice.is_approved else 'false' }}"
+                        data-supplier="{{ invoice.supplier_name|lower }}"
+                        data-invoice-num="{{ invoice.invoice_number|lower }}"
+                        data-tf="{{ (invoice.chq_number or invoice.tf_number or '')|lower }}"
+                        data-pjv="{{ invoice.pjv_number|lower }}">
                         <td class="px-3 py-3 text-center">
-                            <input type="checkbox" class="invoice-checkbox rounded border-gray-300 text-malta-blue focus:ring-malta-blue" value="{{ invoice.id }}" onchange="updateSelectedCount()">
+                            <input type="checkbox" class="invoice-checkbox rounded border-gray-300 text-malta-blue focus:ring-malta-blue" value="{{ invoice.id }}" onchange="updateSelectedCount()" {% if invoice.is_void %}disabled{% endif %}>
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">{{ invoice.supplier.name }}</div>
+                        <td class="px-4 py-3">
+                            <div class="text-sm font-medium text-gray-900 truncate" title="{{ invoice.supplier_name }}">{{ invoice.supplier_name }}</div>
                             <div class="text-xs text-gray-500">{{ invoice.method_request }} / {{ invoice.method_procurement }}</div>
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            {{ invoice.invoice_number }}
-                            {% if invoice.is_ai_generated %}
-                            <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800" title="Created from email">AI</span>
+                        <td class="px-4 py-3 text-sm text-gray-900">
+                            <div class="flex items-center gap-1">
+                                <span class="truncate" title="{{ invoice.invoice_number }}">{{ invoice.invoice_number }}</span>
+                                {% if invoice.is_ai_generated and invoice.email_subject %}
+                                <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 cursor-help"
+                                      title="From email: {{ invoice.email_subject }}{% if invoice.email_from %} ({{ invoice.email_from }}){% endif %}">
+                                    <svg class="w-3 h-3 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Email
+                                </span>
+                                {% elif invoice.is_ai_generated %}
+                                <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800" title="Created from email">AI</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right text-gray-900">
+                            &euro;{{ "{:,.2f}".format(invoice.payment_amount|float) }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-500">
+                            {{ invoice.invoice_date|format_date }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-400">
+                            {% if invoice.created_at %}
+                            <div>{{ invoice.created_at[:10]|format_date }}</div>
+                            <div class="text-xs text-gray-300">{{ invoice.created_at[11:16] if invoice.created_at|length > 16 else '' }}</div>
+                            {% else %}
+                            -
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
-                            &euro;{{ "%.2f"|format(invoice.payment_amount) }}
-                        </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {{ invoice.invoice_date.strftime('%d/%m/%Y') }}
-                        </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                        <td class="px-4 py-3 text-sm text-gray-500 truncate" title="{{ invoice.pjv_number }}">
                             {{ invoice.pjv_number }}
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-center">
-                            {% if invoice.is_approved %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                Approved
-                            </span>
-                            {% else %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                                Not Approved
-                            </span>
-                            {% endif %}
+                        <td class="px-4 py-3 text-center">
+                        {% if invoice.is_void %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                            Voided
+                        </span>
+                        {% elif invoice.is_approved %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Approved
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            Not Approved
+                        </span>
+                        {% endif %}
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-center font-medium">
-                            {% if invoice.tf_number %}
-                            <span class="text-malta-blue">{{ invoice.tf_number }}</span>
+                        <td class="px-4 py-3 text-sm text-center font-medium">
+                            {% if invoice.chq_number %}
+                            <span class="text-amber-600 font-semibold">CHQ {{ invoice.chq_number }}</span>
+                            {% elif invoice.tf_number %}
+                            <span class="text-malta-blue font-semibold">TF {{ invoice.tf_number }}</span>
                             {% else %}
                             <span class="text-gray-400">-</span>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-center">
-                            {% if invoice.fiscal_receipt_path %}
-                            <button onclick="showReceiptModal({{ invoice.id }}, '{{ invoice.pjv_number }}')" class="text-green-600 hover:text-green-800" title="View Receipt">
-                                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                            </button>
-                            {% else %}
-                            <button onclick="showUploadModal({{ invoice.id }}, '{{ invoice.pjv_number }}')" class="text-gray-400 hover:text-gray-600" title="Upload Receipt">
-                                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <td class="px-2 py-3 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick="showUploadModal({{ invoice.id }}, {{ invoice.pjv_number|tojson|forceescape }})" class="text-gray-500 hover:text-malta-blue {% if invoice.is_void %}opacity-40 cursor-not-allowed{% endif %}" title="Upload / Replace receipt" aria-label="Upload or replace receipt" {% if invoice.is_void %}disabled{% endif %}>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
                                 </svg>
                             </button>
+                            {% if invoice.fiscal_receipt_path %}
+                            <button onclick="showReceiptModal({{ invoice.id }}, {{ invoice.pjv_number|tojson|forceescape }})" class="text-green-600 hover:text-green-800" title="View receipt" aria-label="View receipt">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </button>
+                            <button onclick="deleteReceiptInline({{ invoice.id }})" class="text-red-500 hover:text-red-700" title="Delete receipt" aria-label="Delete receipt" {% if invoice.is_void %}disabled{% endif %}>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
                             {% endif %}
+                        </div>
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-right text-sm">
-                            <div class="flex justify-end gap-2">
-                                <a href="/invoices/{{ invoice.id }}/edit" class="text-malta-blue hover:text-malta-blue-dark" title="Edit">
+                        <td class="px-2 py-3 text-right text-sm">
+                            <div class="flex justify-end gap-1">
+                                <a href="/invoices/{{ invoice.id }}/voucher" class="text-gray-500 hover:text-gray-700" title="Print Voucher" aria-label="Print voucher" target="_blank" rel="noopener">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5h20v5a2 2 0 01-2 2h-2m-8 0h4m-8 0v3h8v-3m-8 0h8" />
+                                    </svg>
+                                </a>
+                                <a href="/invoices/{{ invoice.id }}/edit" class="text-malta-blue hover:text-malta-blue-dark" title="Edit" aria-label="Edit invoice">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
                                 </a>
-                                {% if not invoice.is_approved %}
-                                <button onclick="showApproveModal({{ invoice.id }}, '{{ invoice.supplier.name }}', '{{ invoice.invoice_number }}')" class="text-green-600 hover:text-green-800" title="Approve">
+                                {% if not invoice.is_approved and not invoice.is_void %}
+                                <button onclick="event.stopPropagation(); showApproveModal({{ invoice.id }}, {{ invoice.supplier_name|tojson|forceescape }}, {{ invoice.invoice_number|tojson|forceescape }})" class="text-green-600 hover:text-green-800" title="Approve" aria-label="Approve invoice">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
                                 </button>
                                 {% endif %}
-                                <button onclick="showDeleteModal({{ invoice.id }}, '{{ invoice.supplier.name }}', '{{ invoice.invoice_number }}')" class="text-red-600 hover:text-red-800" title="Delete">
+                                {% if not invoice.is_void %}
+                                <button type="button" onclick="event.stopPropagation(); showDeleteModal({{ invoice.id }}, {{ invoice.supplier_name|tojson|forceescape }}, {{ invoice.invoice_number|tojson|forceescape }}, {{ invoice.payment_amount }}, {{ (invoice.chq_number or invoice.tf_number or '')|tojson|forceescape }})" class="text-red-600 hover:text-red-800" title="Delete" aria-label="Delete invoice">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                     </svg>
                                 </button>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="10" class="px-4 py-8 text-center text-gray-500">
+                        <td colspan="11" class="px-4 py-8 text-center text-gray-500">
                             No invoices found. <a href="/invoices/create" class="text-malta-blue hover:underline">Create a new one</a>.
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+
+            <!-- Pagination -->
+            {% if pagination.total_pages > 1 %}
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-4 px-4 py-4 border-t">
+                <p class="text-sm text-gray-600">
+                    Showing {{ pagination.start_item }}-{{ pagination.end_item }} of {{ pagination.total_count }} invoices
+                </p>
+                <div class="flex items-center gap-1">
+                    <!-- Previous Button -->
+                    {% if pagination.has_prev %}
+                    <a href="?page={{ pagination.page - 1 }}&status={{ filters.status }}&sort_by={{ filters.sort_by }}&sort_order={{ filters.sort_order }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.supplier_id %}&supplier_id={{ filters.supplier_id }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.include_void %}&include_void=true{% endif %}"
+                       class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        &larr; Previous
+                    </a>
+                    {% else %}
+                    <span class="px-3 py-1.5 text-sm text-gray-400 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed">
+                        &larr; Previous
+                    </span>
+                    {% endif %}
+
+                    <!-- Page Numbers -->
+                    <div class="flex items-center gap-1 mx-2">
+                        {% set start_page = [1, pagination.page - 2]|max %}
+                        {% set end_page = [pagination.total_pages, pagination.page + 2]|min %}
+
+                        {% if start_page > 1 %}
+                        <a href="?page=1&status={{ filters.status }}&sort_by={{ filters.sort_by }}&sort_order={{ filters.sort_order }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.supplier_id %}&supplier_id={{ filters.supplier_id }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.include_void %}&include_void=true{% endif %}"
+                           class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                            1
+                        </a>
+                        {% if start_page > 2 %}
+                        <span class="px-2 text-gray-400">...</span>
+                        {% endif %}
+                        {% endif %}
+
+                        {% for p in range(start_page, end_page + 1) %}
+                        {% if p == pagination.page %}
+                        <span class="px-3 py-1.5 text-sm text-white bg-malta-blue border border-malta-blue rounded-lg">
+                            {{ p }}
+                        </span>
+                        {% else %}
+                        <a href="?page={{ p }}&status={{ filters.status }}&sort_by={{ filters.sort_by }}&sort_order={{ filters.sort_order }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.supplier_id %}&supplier_id={{ filters.supplier_id }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.include_void %}&include_void=true{% endif %}"
+                           class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                            {{ p }}
+                        </a>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if end_page < pagination.total_pages %}
+                        {% if end_page < pagination.total_pages - 1 %}
+                        <span class="px-2 text-gray-400">...</span>
+                        {% endif %}
+                        <a href="?page={{ pagination.total_pages }}&status={{ filters.status }}&sort_by={{ filters.sort_by }}&sort_order={{ filters.sort_order }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.supplier_id %}&supplier_id={{ filters.supplier_id }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.include_void %}&include_void=true{% endif %}"
+                           class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                            {{ pagination.total_pages }}
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    <!-- Next Button -->
+                    {% if pagination.has_next %}
+                    <a href="?page={{ pagination.page + 1 }}&status={{ filters.status }}&sort_by={{ filters.sort_by }}&sort_order={{ filters.sort_order }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.supplier_id %}&supplier_id={{ filters.supplier_id }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.include_void %}&include_void=true{% endif %}"
+                       class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        Next &rarr;
+                    </a>
+                    {% else %}
+                    <span class="px-3 py-1.5 text-sm text-gray-400 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed">
+                        Next &rarr;
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% elif pagination.total_count > 0 %}
+            <div class="px-4 py-3 border-t">
+                <p class="text-sm text-gray-600">
+                    Showing all {{ pagination.total_count }} invoice{% if pagination.total_count != 1 %}s{% endif %}
+                </p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -316,15 +525,17 @@
             Invoice from <strong id="approveSupplier"></strong> (#<span id="approveInvoiceNum"></span>)
         </p>
         <form id="approveForm" method="POST">
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Proposer Councillor</label>
-                    <input type="text" name="proposer_councillor" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Seconder Councillor</label>
-                    <input type="text" name="seconder_councillor" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
-                </div>
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+            <div class="space-y-3">
+                <p class="text-sm font-medium text-gray-700">Select approval type:</p>
+                <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-blue-50 border-malta-blue bg-blue-50">
+                    <input type="radio" name="number_type" value="TF" checked class="h-4 w-4 text-malta-blue focus:ring-malta-blue border-gray-300">
+                    <span class="ml-3 text-sm font-medium text-gray-900">TF Number (Transfer of Funds)</span>
+                </label>
+                <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-amber-50 border-gray-300">
+                    <input type="radio" name="number_type" value="CHQ" class="h-4 w-4 text-amber-600 focus:ring-amber-600 border-gray-300">
+                    <span class="ml-3 text-sm font-medium text-gray-900">CHQ Number (Cheque)</span>
+                </label>
             </div>
             <div class="mt-6 flex justify-end gap-3">
                 <button type="button" onclick="hideApproveModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
@@ -342,13 +553,20 @@
 <div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
     <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h3 class="text-lg font-bold text-gray-900 mb-4">Delete Invoice</h3>
-        <p class="text-gray-600 mb-4">
-            Are you sure you want to delete the invoice from <strong id="deleteSupplier"></strong> (#<span id="deleteInvoiceNum"></span>)?
+        <p class="text-gray-600 mb-2">
+            Are you sure you want to delete this invoice?
         </p>
+        <div class="bg-gray-50 rounded-lg p-3 mb-4 space-y-1">
+            <p class="text-sm"><span class="text-gray-500">Supplier:</span> <strong id="deleteSupplier"></strong></p>
+            <p class="text-sm"><span class="text-gray-500">Invoice #:</span> <span id="deleteInvoiceNum"></span></p>
+            <p class="text-sm"><span class="text-gray-500">Amount:</span> <strong id="deleteAmount" class="text-red-600"></strong></p>
+            <p class="text-sm" id="deleteTfRow"><span class="text-gray-500">TF/CHQ #:</span> <span id="deleteTfNum" class="font-medium text-malta-blue"></span></p>
+        </div>
         <p class="text-sm text-amber-600 mb-4">
-            This action cannot be undone. The TF number will not be reused.
+            This action cannot be undone. The TF/CHQ number will not be reused.
         </p>
         <form id="deleteForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
             <div class="flex justify-end gap-3">
                 <button type="button" onclick="hideDeleteModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
                     Cancel
@@ -369,6 +587,7 @@
             Upload fiscal receipt for PJV: <strong id="uploadPjv"></strong>
         </p>
         <form id="uploadForm" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
             <input type="hidden" id="uploadInvoiceId" name="invoice_id">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Select File (PDF, JPG, PNG)</label>
@@ -418,70 +637,331 @@
         </div>
     </div>
 </div>
+
+<!-- Bulk Approve Modal -->
+<div id="bulkApproveModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4">Bulk Approve Invoices</h3>
+        <p class="text-gray-600 mb-4">
+            Approving <strong id="bulkApproveCount">0</strong> invoice(s)
+        </p>
+        <p class="text-sm text-amber-600 mb-4">
+            Note: Bulk approval does NOT record councillor names. Use individual approval for full audit trail.
+        </p>
+        <div class="space-y-3 mb-6">
+            <p class="text-sm font-medium text-gray-700">Select approval type for all:</p>
+            <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-blue-50 border-malta-blue bg-blue-50">
+                <input type="radio" name="bulk_number_type" value="TF" checked class="h-4 w-4 text-malta-blue focus:ring-malta-blue border-gray-300">
+                <span class="ml-3 text-sm font-medium text-gray-900">TF Number (Transfer of Funds)</span>
+            </label>
+            <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-amber-50 border-gray-300">
+                <input type="radio" name="bulk_number_type" value="CHQ" class="h-4 w-4 text-amber-600 focus:ring-amber-600 border-gray-300">
+                <span class="ml-3 text-sm font-medium text-gray-900">CHQ Number (Cheque)</span>
+            </label>
+        </div>
+        <div class="flex justify-end gap-3">
+            <button type="button" onclick="hideBulkApproveModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
+                Cancel
+            </button>
+            <button type="button" onclick="submitBulkApprove()" class="px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700">
+                Approve All
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Export All Modal -->
+<div id="exportAllModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4">Export Invoices</h3>
+        <form id="exportAllForm" onsubmit="submitExportAll(event)">
+            <input type="hidden" id="exportAllFormat" value="pdf">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                    <input type="date" id="exportDateFrom" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue" value="{{ filters.date_from or '' }}">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                    <input type="date" id="exportDateTo" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue" value="{{ filters.date_to or '' }}">
+                </div>
+            </div>
+            <div class="flex items-center gap-2 mt-4">
+                <input type="checkbox" id="exportIncludeVoid" class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded" {% if filters.include_void %}checked{% endif %}>
+                <label for="exportIncludeVoid" class="text-sm text-gray-700">Include voided invoices</label>
+            </div>
+            <div class="mt-4">
+                <p class="text-sm font-medium text-gray-700 mb-2">Signatories (saved for next export)</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="exportSindku" class="block text-sm font-medium text-gray-700 mb-1">Sindku</label>
+                        <input type="text" id="exportSindku" maxlength="120" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue" value="{{ export_signatories.sindku or '' }}">
+                    </div>
+                    <div>
+                        <label for="exportSegretarjuEzekuttiv" class="block text-sm font-medium text-gray-700 mb-1">Segretarju Ezekuttiv</label>
+                        <input type="text" id="exportSegretarjuEzekuttiv" maxlength="120" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue" value="{{ export_signatories.segretarju_ezekuttiv or '' }}">
+                    </div>
+                    <div>
+                        <label for="exportProponent" class="block text-sm font-medium text-gray-700 mb-1">Proponent</label>
+                        <input type="text" id="exportProponent" maxlength="120" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue" value="{{ export_signatories.proponent or '' }}">
+                    </div>
+                    <div>
+                        <label for="exportSekondant" class="block text-sm font-medium text-gray-700 mb-1">Sekondant</label>
+                        <input type="text" id="exportSekondant" maxlength="120" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue" value="{{ export_signatories.sekondant or '' }}">
+                    </div>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Leave dates empty to export all (defaults to current filters).</p>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" onclick="hideExportAllModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="submit" class="px-4 py-2 text-white bg-malta-blue rounded-lg hover:bg-malta-blue-dark">Export</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 let currentReceiptInvoiceId = null;
+let lastInvoiceCheckboxIndex = null;
+const exportSignatoryDraftKey = 'invoice_export_signatories_draft';
+
+function getExportSignatoryInputIds() {
+    return ['exportSindku', 'exportSegretarjuEzekuttiv', 'exportProponent', 'exportSekondant'];
+}
+
+function saveExportSignatoryDraft() {
+    const payload = {
+        sindku: document.getElementById('exportSindku')?.value?.trim() || '',
+        segretarju_ezekuttiv: document.getElementById('exportSegretarjuEzekuttiv')?.value?.trim() || '',
+        proponent: document.getElementById('exportProponent')?.value?.trim() || '',
+        sekondant: document.getElementById('exportSekondant')?.value?.trim() || ''
+    };
+    localStorage.setItem(exportSignatoryDraftKey, JSON.stringify(payload));
+}
+
+function loadExportSignatoryDraft() {
+    let draft = null;
+    try {
+        draft = JSON.parse(localStorage.getItem(exportSignatoryDraftKey) || '{}');
+    } catch (_) {
+        draft = {};
+    }
+
+    if (!draft || typeof draft !== 'object') return;
+
+    const fields = [
+        ['exportSindku', 'sindku'],
+        ['exportSegretarjuEzekuttiv', 'segretarju_ezekuttiv'],
+        ['exportProponent', 'proponent'],
+        ['exportSekondant', 'sekondant']
+    ];
+
+    fields.forEach(([inputId, key]) => {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        if (!input.value && typeof draft[key] === 'string') {
+            input.value = draft[key];
+        }
+    });
+}
 
 // Selection functions
+function getSelectableInvoiceCheckboxes() {
+    return Array.from(document.querySelectorAll('.invoice-checkbox')).filter(cb => !cb.disabled);
+}
+
+function getCheckedInvoiceCheckboxes() {
+    return getSelectableInvoiceCheckboxes().filter(cb => cb.checked);
+}
+
 function toggleSelectAll() {
     const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.invoice-checkbox');
+    const checkboxes = getSelectableInvoiceCheckboxes();
     checkboxes.forEach(cb => cb.checked = selectAll.checked);
     updateSelectedCount();
 }
 
 function updateSelectedCount() {
-    const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
-    const count = checkboxes.length;
+    const checkboxes = getSelectableInvoiceCheckboxes();
+    const checked = checkboxes.filter(cb => cb.checked);
+    const count = checked.length;
     document.getElementById('selectedCount').textContent = count;
 
     const bulkApproveBtn = document.getElementById('bulkApproveBtn');
     const bulkUnapproveBtn = document.getElementById('bulkUnapproveBtn');
     const exportSelectedBtn = document.getElementById('exportSelectedBtn');
+    const printSelectedBtn = document.getElementById('printSelectedBtn');
 
     bulkApproveBtn.disabled = count === 0;
     bulkUnapproveBtn.disabled = count === 0;
     exportSelectedBtn.disabled = count === 0;
+    printSelectedBtn.disabled = count === 0;
+
+    // Update select-all state (ignore disabled checkboxes)
+    const selectAll = document.getElementById('selectAll');
+    if (selectAll) {
+        if (checkboxes.length === 0) {
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+        } else {
+            selectAll.checked = count === checkboxes.length;
+            selectAll.indeterminate = count > 0 && count < checkboxes.length;
+        }
+    }
 }
 
 function getSelectedIds() {
-    const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
-    return Array.from(checkboxes).map(cb => parseInt(cb.value));
+    return getCheckedInvoiceCheckboxes().map(cb => parseInt(cb.value));
 }
 
 function getPendingSelectedIds() {
-    const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
-    return Array.from(checkboxes)
+    return getCheckedInvoiceCheckboxes()
         .filter(cb => cb.closest('tr').dataset.isPending === 'true')
         .map(cb => parseInt(cb.value));
 }
 
 function getApprovedSelectedIds() {
-    const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
-    return Array.from(checkboxes)
+    return getCheckedInvoiceCheckboxes()
         .filter(cb => cb.closest('tr').dataset.isPending === 'false')
         .map(cb => parseInt(cb.value));
 }
 
-// Bulk approve
-async function bulkApprove() {
+function setupInvoiceRangeSelection() {
+    document.querySelectorAll('.invoice-checkbox').forEach(cb => {
+        if (cb.disabled) return;
+        cb.addEventListener('click', function(e) {
+            const checkboxes = getSelectableInvoiceCheckboxes();
+            const index = checkboxes.indexOf(cb);
+            if (index === -1) return;
+
+            if (e.shiftKey && lastInvoiceCheckboxIndex !== null) {
+                const start = Math.min(lastInvoiceCheckboxIndex, index);
+                const end = Math.max(lastInvoiceCheckboxIndex, index);
+                for (let i = start; i <= end; i++) {
+                    checkboxes[i].checked = cb.checked;
+                }
+            }
+
+            lastInvoiceCheckboxIndex = index;
+            updateSelectedCount();
+        });
+    });
+
+    updateSelectedCount();
+}
+
+async function printSelectedVouchers() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) {
+        alert('No invoices selected');
+        return;
+    }
+
+    const btn = document.getElementById('printSelectedBtn');
+    const prevHtml = btn ? btn.innerHTML : null;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Preparing vouchers...';
+    }
+
+    try {
+        const response = await fetch(`/export/selected/voucher-pdf`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invoice_ids: ids })
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok) {
+            if (contentType.includes('application/json')) {
+                const error = await response.json();
+                alert('Error: ' + (error.error || 'Print failed'));
+            } else {
+                alert('Error: Print failed with status ' + response.status);
+            }
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        const w = window.open(url, '_blank');
+        if (!w) {
+            // Popup blocked: fall back to download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Payment_Vouchers_${new Date().toISOString().slice(0,10).replaceAll('-','')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            return;
+        }
+
+        // Best-effort auto-print (browser PDF viewers may ignore this).
+        setTimeout(() => {
+            try {
+                w.focus();
+                w.print();
+            } catch (e) {
+                // Ignore: user can print manually in the new tab.
+            }
+        }, 800);
+    } catch (error) {
+        alert('Error printing vouchers: ' + error.message);
+    } finally {
+        if (btn && prevHtml !== null) {
+            btn.innerHTML = prevHtml;
+            btn.disabled = getSelectedIds().length === 0;
+        }
+    }
+}
+
+// Bulk approve - show modal to select TF or CHQ
+let pendingBulkApproveIds = [];
+
+function bulkApprove() {
     const ids = getPendingSelectedIds();
     if (ids.length === 0) {
         alert('No non-approved invoices selected');
         return;
     }
 
-    if (!confirm(`Are you sure you want to approve ${ids.length} invoice(s)?`)) {
+    // Store IDs and show modal
+    pendingBulkApproveIds = ids;
+    document.getElementById('bulkApproveCount').textContent = ids.length;
+
+    // Reset to TF as default
+    document.querySelector('input[name="bulk_number_type"][value="TF"]').checked = true;
+
+    // Show modal
+    document.getElementById('bulkApproveModal').classList.remove('hidden');
+    document.getElementById('bulkApproveModal').classList.add('flex');
+}
+
+function hideBulkApproveModal() {
+    document.getElementById('bulkApproveModal').classList.add('hidden');
+    document.getElementById('bulkApproveModal').classList.remove('flex');
+    pendingBulkApproveIds = [];
+}
+
+async function submitBulkApprove() {
+    if (pendingBulkApproveIds.length === 0) {
+        hideBulkApproveModal();
         return;
     }
+
+    const numberType = document.querySelector('input[name="bulk_number_type"]:checked').value;
 
     try {
         const response = await fetch('/invoices/bulk-approve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ invoice_ids: ids })
+            body: JSON.stringify({
+                invoice_ids: pendingBulkApproveIds,
+                number_type: numberType
+            })
         });
 
         const data = await response.json();
@@ -495,6 +975,8 @@ async function bulkApprove() {
     } catch (error) {
         alert('Error approving invoices: ' + error.message);
     }
+
+    hideBulkApproveModal();
 }
 
 // Bulk unapprove
@@ -540,6 +1022,48 @@ function toggleExportAllDropdown() {
     document.getElementById('exportSelectedMenu').classList.add('hidden');
 }
 
+// Export all modal helpers
+function openExportAllModal(format) {
+    document.getElementById('exportAllFormat').value = format;
+    loadExportSignatoryDraft();
+    document.getElementById('exportAllModal').classList.remove('hidden');
+    document.getElementById('exportAllModal').classList.add('flex');
+    document.getElementById('exportDateFrom').focus();
+}
+
+function hideExportAllModal() {
+    document.getElementById('exportAllModal').classList.add('hidden');
+    document.getElementById('exportAllModal').classList.remove('flex');
+}
+
+function submitExportAll(e) {
+    e.preventDefault();
+    const format = document.getElementById('exportAllFormat').value;
+    const df = document.getElementById('exportDateFrom').value;
+    const dt = document.getElementById('exportDateTo').value;
+    const includeVoid = document.getElementById('exportIncludeVoid').checked ? '1' : '0';
+    const sindku = document.getElementById('exportSindku').value.trim();
+    const segretarjuEzekuttiv = document.getElementById('exportSegretarjuEzekuttiv').value.trim();
+    const proponent = document.getElementById('exportProponent').value.trim();
+    const sekondant = document.getElementById('exportSekondant').value.trim();
+    saveExportSignatoryDraft();
+
+    const params = new URLSearchParams({
+        status: "{{ filters.status }}",
+        supplier_id: "{{ filters.supplier_id or '' }}",
+        include_void: includeVoid,
+        sindku: sindku,
+        segretarju_ezekuttiv: segretarjuEzekuttiv,
+        proponent: proponent,
+        sekondant: sekondant
+    });
+    if (df) params.append('date_from', df);
+    if (dt) params.append('date_to', dt);
+
+    window.location.href = `/export/${format}?` + params.toString();
+    hideExportAllModal();
+}
+
 // Close dropdowns when clicking outside
 document.addEventListener('click', function(e) {
     if (!e.target.closest('#exportSelectedDropdown')) {
@@ -558,11 +1082,19 @@ async function exportSelected(format) {
         return;
     }
 
+    const endpoint = format === 'voucher' ? 'voucher-pdf' : format;
+    const dateFrom = "{{ filters.date_from or '' }}";
+    const dateTo = "{{ filters.date_to or '' }}";
+
     try {
-        const response = await fetch(`/export/selected/${format}`, {
+        const response = await fetch(`/export/selected/${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ invoice_ids: ids })
+            body: JSON.stringify({
+                invoice_ids: ids,
+                date_from: dateFrom || null,
+                date_to: dateTo || null
+            })
         });
 
         // Check content type to determine how to handle response
@@ -585,7 +1117,12 @@ async function exportSelected(format) {
 
         // Get filename from header or use default
         const disposition = response.headers.get('Content-Disposition');
-        let filename = `export.${format === 'excel' ? 'xlsx' : format}`;
+        let filename = 'export.pdf';
+        if (format === 'csv') {
+            filename = 'export.csv';
+        } else if (format === 'excel') {
+            filename = 'export.xlsx';
+        }
         if (disposition && disposition.includes('filename=')) {
             filename = disposition.split('filename=')[1].replace(/"/g, '');
         }
@@ -617,10 +1154,21 @@ function hideApproveModal() {
 }
 
 // Delete modal functions
-function showDeleteModal(id, supplier, invoiceNum) {
+function showDeleteModal(id, supplier, invoiceNum, amount, tfNum) {
     document.getElementById('deleteSupplier').textContent = supplier;
     document.getElementById('deleteInvoiceNum').textContent = invoiceNum;
+    document.getElementById('deleteAmount').textContent = 'EUR ' + amount.toFixed(2);
     document.getElementById('deleteForm').action = '/invoices/' + id + '/delete';
+
+    // Show/hide TF number row
+    const tfRow = document.getElementById('deleteTfRow');
+    if (tfNum) {
+        document.getElementById('deleteTfNum').textContent = tfNum;
+        tfRow.style.display = '';
+    } else {
+        tfRow.style.display = 'none';
+    }
+
     document.getElementById('deleteModal').classList.remove('hidden');
     document.getElementById('deleteModal').classList.add('flex');
 }
@@ -715,6 +1263,25 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
     }
 });
 
+// Inline delete receipt
+async function deleteReceiptInline(invoiceId) {
+    if (!confirm('Delete this fiscal receipt?')) return;
+    try {
+        const response = await fetch('/invoices/' + invoiceId + '/fiscal-receipt', {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+        if (data.success) {
+            alert('Receipt deleted successfully');
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error deleting receipt: ' + error.message);
+    }
+}
+
 // Close modals on escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
@@ -722,17 +1289,21 @@ document.addEventListener('keydown', function(e) {
         hideDeleteModal();
         hideUploadModal();
         hideReceiptModal();
+        hideBulkApproveModal();
+        hideExportAllModal();
     }
 });
 
 // Close modals on backdrop click
-['approveModal', 'deleteModal', 'uploadModal', 'receiptModal'].forEach(modalId => {
+['approveModal', 'deleteModal', 'uploadModal', 'receiptModal', 'bulkApproveModal', 'exportAllModal'].forEach(modalId => {
     document.getElementById(modalId).addEventListener('click', function(e) {
         if (e.target === this) {
             if (modalId === 'approveModal') hideApproveModal();
             else if (modalId === 'deleteModal') hideDeleteModal();
             else if (modalId === 'uploadModal') hideUploadModal();
             else if (modalId === 'receiptModal') hideReceiptModal();
+            else if (modalId === 'bulkApproveModal') hideBulkApproveModal();
+            else if (modalId === 'exportAllModal') hideExportAllModal();
         }
     });
 });
@@ -780,6 +1351,29 @@ document.addEventListener('click', function(e) {
     if (dropdown && button && !dropdown.contains(e.target) && !button.contains(e.target)) {
         dropdown.classList.add('hidden');
     }
+});
+
+// Keyboard shortcut: Ctrl+F or / to focus search
+document.addEventListener('keydown', function(e) {
+    // Ctrl+F to focus search (prevent browser's find)
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        document.getElementById('quickSearch').focus();
+        document.getElementById('quickSearch').select();
+    }
+    // / key to focus search (when not in an input)
+    if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+        e.preventDefault();
+        document.getElementById('quickSearch').focus();
+    }
+});
+
+setupInvoiceRangeSelection();
+
+getExportSignatoryInputIds().forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener('input', saveExportSignatoryDraft);
 });
 </script>
 {% endblock %}

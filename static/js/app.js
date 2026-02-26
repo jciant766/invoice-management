@@ -4,6 +4,21 @@
  */
 
 // ========================================
+// SECURITY UTILITIES
+// ========================================
+
+/**
+ * Escape HTML to prevent XSS attacks
+ * Always use this when inserting user/server data into innerHTML
+ */
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+// ========================================
 // ERROR HANDLING SYSTEM
 // ========================================
 // This replaces ugly Chrome error pages with nice user-friendly messages
@@ -82,16 +97,16 @@ function showErrorModal({title, message, details = {}, action = null}) {
             </div>
 
             <!-- Error Title -->
-            <h3 class="text-lg font-bold text-gray-900 text-center mb-2">${title}</h3>
+            <h3 class="text-lg font-bold text-gray-900 text-center mb-2">${escapeHtml(title)}</h3>
 
             <!-- Error Message -->
-            <p class="text-gray-700 text-center mb-4">${message}</p>
+            <p class="text-gray-700 text-center mb-4">${escapeHtml(message)}</p>
 
             <!-- User Action (what to do) -->
             ${action ? `
                 <div class="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
                     <p class="text-sm text-blue-700">
-                        <strong>What to do:</strong> ${action}
+                        <strong>What to do:</strong> ${escapeHtml(action)}
                     </p>
                 </div>
             ` : ''}
@@ -102,7 +117,7 @@ function showErrorModal({title, message, details = {}, action = null}) {
                     <summary class="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
                         Show technical details
                     </summary>
-                    <pre class="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto">${JSON.stringify(details, null, 2)}</pre>
+                    <pre class="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto">${escapeHtml(JSON.stringify(details, null, 2))}</pre>
                 </details>
             ` : ''}
 
@@ -145,15 +160,15 @@ function showToast(message, type = 'success') {
 
     // Add icon based on type
     const icons = {
-        'success': '✓',
-        'error': '✕',
-        'info': 'ℹ',
-        'warning': '⚠'
+        'success': 'OK',
+        'error': 'X',
+        'info': 'i',
+        'warning': '!'
     };
 
     toast.innerHTML = `
         <span class="toast-icon">${icons[type] || ''}</span>
-        <span>${message}</span>
+        <span>${escapeHtml(message)}</span>
     `;
 
     document.body.appendChild(toast);
@@ -331,28 +346,8 @@ function exportTableToCSV(tableId, filename = 'export.csv') {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    // Add loading state to forms
-    document.querySelectorAll('form').forEach(form => {
-        form.addEventListener('submit', function() {
-            const submitBtn = this.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<span class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>Processing...';
-            }
-        });
-    });
-
-    // Auto-focus first input in forms
-    const firstInput = document.querySelector('form input:not([type="hidden"]):not([type="checkbox"])');
-    if (firstInput) {
-        firstInput.focus();
-    }
-
-    // Add tooltips
-    document.querySelectorAll('[title]').forEach(el => {
-        el.classList.add('cursor-help');
-    });
-
+    // Double-click prevention is handled in base.html
+    // This file only handles shared utilities.
     console.log('Invoice Management System loaded');
 });
 

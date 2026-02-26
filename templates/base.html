@@ -23,7 +23,7 @@
     <!-- Header -->
     <header class="bg-malta-blue text-white shadow-lg">
         <div class="max-w-7xl mx-auto px-4 py-4">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-4">
                 <div class="flex items-center space-x-4">
                     <div class="flex items-center">
                         <svg class="w-10 h-10 mr-3" fill="currentColor" viewBox="0 0 24 24">
@@ -35,7 +35,21 @@
                         </div>
                     </div>
                 </div>
-                <nav class="flex items-center space-x-1">
+
+                <!-- Mobile menu toggle -->
+                <button id="mobileMenuBtn"
+                        type="button"
+                        class="md:hidden inline-flex items-center justify-center rounded-lg p-2 hover:bg-malta-blue-dark transition"
+                        aria-label="Toggle navigation menu"
+                        aria-expanded="false"
+                        aria-controls="mobileMenu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+
+                <!-- Desktop navigation -->
+                <nav class="hidden md:flex items-center space-x-1">
                     <a href="/invoices" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition {% if request.url.path == '/invoices' %}bg-malta-blue-dark{% endif %}">
                         Invoices
                     </a>
@@ -51,50 +65,106 @@
                     <a href="/suppliers" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition {% if request.url.path.startswith('/suppliers') %}bg-malta-blue-dark{% endif %}">
                         Suppliers
                     </a>
-                    <div class="relative group">
-                        <button class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition flex items-center">
-                            Export
-                            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </button>
-                        <div class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 hidden group-hover:block z-50">
-                            <p class="px-4 py-1 text-xs text-gray-500 uppercase">CSV</p>
-                            <a href="/export/csv" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                CSV - All
-                            </a>
-                            <a href="/export/csv?approved_only=true" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                CSV - Approved Only
-                            </a>
-                            <hr class="my-2">
-                            <p class="px-4 py-1 text-xs text-gray-500 uppercase">Excel</p>
-                            <a href="/export/excel" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                Excel - All
-                            </a>
-                            <a href="/export/excel?approved_only=true" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                Excel - Approved Only
-                            </a>
-                            <a href="/export/pending/excel" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                Excel - Not Approved Only
-                            </a>
-                            <hr class="my-2">
-                            <p class="px-4 py-1 text-xs text-gray-500 uppercase">PDF</p>
-                            <a href="/export/pdf" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                PDF - All
-                            </a>
-                            <a href="/export/pdf?approved_only=true" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                PDF - Approved Only
-                            </a>
-                            <a href="/export/pending/pdf" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                PDF - Not Approved Only
-                            </a>
-                        </div>
-                    </div>
                     <a href="/settings" class="px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition {% if request.url.path.startswith('/settings') %}bg-malta-blue-dark{% endif %}">
                         Settings
                     </a>
+                    <!-- User Menu -->
+                    <div class="relative ml-2 pl-2 border-l border-blue-400" id="userMenuWrapper">
+                        <button id="userMenuBtn"
+                                type="button"
+                                class="px-3 py-2 rounded-lg hover:bg-malta-blue-dark transition flex items-center gap-2"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                aria-controls="userMenuDesktop">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                            <span class="text-sm">{% if request.state.user %}{{ request.state.user.username }}{% else %}User{% endif %}</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="userMenuDesktop" class="absolute right-0 top-full pt-1 w-48 hidden z-50">
+                            <div class="bg-white rounded-lg shadow-lg py-2">
+                            {% if request.state.user %}
+                            <div class="px-4 py-2 border-b">
+                                <p class="text-sm font-medium text-gray-900">{{ request.state.user.username }}</p>
+                                <p class="text-xs text-gray-500">{{ request.state.user.role | title }}</p>
+                            </div>
+                            {% endif %}
+                            {% if request.state.user and request.state.user.role == 'admin' %}
+                            <a href="/users" class="block px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                </svg>
+                                Users
+                            </a>
+                            <a href="/audit" class="block px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                                </svg>
+                                Audit Logs
+                            </a>
+                            <hr class="my-1">
+                            {% endif %}
+                            <a href="/account/security" class="block px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 .74-.2 1.43-.55 2.03L10 16h4l-1.45-2.97A3.98 3.98 0 0012 11zm0 0a4 4 0 110-8 4 4 0 010 8zm8 9H4a2 2 0 01-2-2v-1a7 7 0 017-7h6a7 7 0 017 7v1a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Account Security
+                            </a>
+                            <form method="POST" action="/logout" style="margin:0">
+                                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                                <button type="submit" class="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                    </svg>
+                                    Logout
+                                </button>
+                            </form>
+                            </div>
+                        </div>
+                    </div>
                 </nav>
             </div>
+
+            <!-- Mobile navigation -->
+            <nav id="mobileMenu" class="md:hidden hidden mt-4 pt-4 border-t border-blue-400">
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <a href="/invoices" class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition {% if request.url.path == '/invoices' %}bg-white/20{% endif %}">
+                        Invoices
+                    </a>
+                    <a href="/email" class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition {% if request.url.path.startswith('/email') %}bg-white/20{% endif %}">
+                        Emails
+                    </a>
+                    <a href="/invoices/create" class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition {% if 'create' in request.url.path %}bg-white/20{% endif %}">
+                        + New Invoice
+                    </a>
+                    <a href="/suppliers" class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition {% if request.url.path.startswith('/suppliers') %}bg-white/20{% endif %}">
+                        Suppliers
+                    </a>
+                    <a href="/settings" class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition {% if request.url.path.startswith('/settings') %}bg-white/20{% endif %}">
+                        Settings
+                    </a>
+                    <a href="/account/security" class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
+                        Account Security
+                    </a>
+                    {% if request.state.user and request.state.user.role == 'admin' %}
+                    <a href="/users" class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
+                        Users
+                    </a>
+                    <a href="/audit" class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
+                        Audit Logs
+                    </a>
+                    {% endif %}
+                    <form method="POST" action="/logout" style="display:inline;margin:0">
+                        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                        <button type="submit" class="px-3 py-2 rounded-lg bg-red-600/80 hover:bg-red-600 transition">
+                            Logout
+                        </button>
+                    </form>
+                </div>
+            </nav>
         </div>
     </header>
 
@@ -109,10 +179,103 @@
     <footer class="bg-gray-100 border-t mt-auto">
         <div class="max-w-7xl mx-auto px-4 py-4 text-center text-gray-500 text-sm">
             &copy; 2025 Sliema Local Council. Invoice Management System.
+            <span class="mx-2">|</span>
+            <a href="/terms" class="hover:underline">Terms of Service</a>
+            <span class="mx-2">|</span>
+            <a href="/privacy" class="hover:underline">Privacy Policy</a>
         </div>
     </footer>
 
     <script src="/static/js/app.js"></script>
+    <script>
+    // Global double-click prevention for POST forms only
+    // GET forms (filters, search) just navigate and don't need protection
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('form').forEach(function(form) {
+            // Skip GET forms - they just navigate, double-submit is harmless
+            var method = (form.getAttribute('method') || 'GET').toUpperCase();
+            if (method === 'GET') return;
+
+            var submitted = false;
+            form.addEventListener('submit', function(e) {
+                var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+                if (submitBtn && !submitBtn.dataset.allowMultiple) {
+                    // Block if already submitted
+                    if (submitted) {
+                        e.preventDefault();
+                        return false;
+                    }
+                    submitted = true;
+
+                    // IMPORTANT: Delay disabling the button to allow form submission to proceed
+                    // Some browsers won't submit if button is disabled during submit event
+                    var originalText = submitBtn.innerHTML;
+                    setTimeout(function() {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<span class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>Processing...';
+                    }, 0);
+
+                    // Re-enable after 10 seconds in case of error (server timeout etc)
+                    setTimeout(function() {
+                        submitted = false;
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalText;
+                    }, 10000);
+                }
+            });
+        });
+
+        var mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        var mobileMenu = document.getElementById('mobileMenu');
+        if (mobileMenuBtn && mobileMenu) {
+            mobileMenuBtn.addEventListener('click', function() {
+                var isOpen = !mobileMenu.classList.contains('hidden');
+                mobileMenu.classList.toggle('hidden');
+                mobileMenuBtn.setAttribute('aria-expanded', String(!isOpen));
+            });
+        }
+
+        function setupDropdownMenu(buttonId, menuId) {
+            var btn = document.getElementById(buttonId);
+            var menu = document.getElementById(menuId);
+            if (!btn || !menu) return;
+
+            function closeMenu() {
+                menu.classList.add('hidden');
+                btn.setAttribute('aria-expanded', 'false');
+            }
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var willOpen = menu.classList.contains('hidden');
+                document.querySelectorAll('#exportMenuDesktop, #userMenuDesktop').forEach(function(el) {
+                    if (el !== menu) el.classList.add('hidden');
+                });
+                document.querySelectorAll('#exportMenuBtn, #userMenuBtn').forEach(function(el) {
+                    if (el !== btn) el.setAttribute('aria-expanded', 'false');
+                });
+                menu.classList.toggle('hidden');
+                btn.setAttribute('aria-expanded', String(willOpen));
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!menu.contains(e.target) && !btn.contains(e.target)) {
+                    closeMenu();
+                }
+            });
+
+            btn.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeMenu();
+                    btn.blur();
+                }
+            });
+        }
+
+        setupDropdownMenu('exportMenuBtn', 'exportMenuDesktop');
+        setupDropdownMenu('userMenuBtn', 'userMenuDesktop');
+    });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

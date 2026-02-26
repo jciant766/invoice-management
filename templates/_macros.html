@@ -1,0 +1,108 @@
+{# Reusable template macros for pagination and messages #}
+
+{# Success message alert #}
+{% macro success_message() %}
+{% if request.query_params.get('success') %}
+<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 flex justify-between items-center">
+    <div class="flex items-center">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        {{ request.query_params.get('success') | replace('+', ' ') }}
+    </div>
+    <button onclick="this.parentElement.remove()" class="text-green-700 hover:text-green-900">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+    </button>
+</div>
+{% endif %}
+{% endmacro %}
+
+{# Error message alert #}
+{% macro error_message() %}
+{% if request.query_params.get('error') %}
+<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex justify-between items-center">
+    <div class="flex items-center">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        {{ request.query_params.get('error') | replace('+', ' ') }}
+    </div>
+    <button onclick="this.parentElement.remove()" class="text-red-700 hover:text-red-900">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+    </button>
+</div>
+{% endif %}
+{% endmacro %}
+
+{# Combined success and error messages #}
+{% macro flash_messages() %}
+{{ success_message() }}
+{{ error_message() }}
+{% endmacro %}
+
+{# Pagination component #}
+{% macro pagination_nav(pagination, entity_name='items', base_url='') %}
+{% if pagination.total_pages > 1 %}
+<div class="flex flex-col sm:flex-row justify-between items-center gap-4 px-4 py-4 border-t">
+    <p class="text-sm text-gray-600">
+        Showing {{ pagination.start_item }}-{{ pagination.end_item }} of {{ pagination.total_count }} {{ entity_name }}
+    </p>
+    <div class="flex items-center gap-1">
+        {% if pagination.has_prev %}
+        <a href="{{ base_url }}?page={{ pagination.page - 1 }}"
+           class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+            &larr; Previous
+        </a>
+        {% else %}
+        <span class="px-3 py-1.5 text-sm text-gray-400 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed">
+            &larr; Previous
+        </span>
+        {% endif %}
+
+        <div class="flex items-center gap-1 mx-2">
+            {% set start_page = [1, pagination.page - 2]|max %}
+            {% set end_page = [pagination.total_pages, pagination.page + 2]|min %}
+
+            {% if start_page > 1 %}
+            <a href="{{ base_url }}?page=1" class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">1</a>
+            {% if start_page > 2 %}<span class="px-2 text-gray-400">...</span>{% endif %}
+            {% endif %}
+
+            {% for p in range(start_page, end_page + 1) %}
+            {% if p == pagination.page %}
+            <span class="px-3 py-1.5 text-sm text-white bg-malta-blue border border-malta-blue rounded-lg">{{ p }}</span>
+            {% else %}
+            <a href="{{ base_url }}?page={{ p }}" class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">{{ p }}</a>
+            {% endif %}
+            {% endfor %}
+
+            {% if end_page < pagination.total_pages %}
+            {% if end_page < pagination.total_pages - 1 %}<span class="px-2 text-gray-400">...</span>{% endif %}
+            <a href="{{ base_url }}?page={{ pagination.total_pages }}" class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">{{ pagination.total_pages }}</a>
+            {% endif %}
+        </div>
+
+        {% if pagination.has_next %}
+        <a href="{{ base_url }}?page={{ pagination.page + 1 }}"
+           class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+            Next &rarr;
+        </a>
+        {% else %}
+        <span class="px-3 py-1.5 text-sm text-gray-400 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed">
+            Next &rarr;
+        </span>
+        {% endif %}
+    </div>
+</div>
+{% elif pagination.total_count > 0 %}
+<div class="px-4 py-3 border-t">
+    <p class="text-sm text-gray-600">
+        Showing all {{ pagination.total_count }} {{ entity_name }}{% if pagination.total_count != 1 %}{% endif %}
+    </p>
+</div>
+{% endif %}
+{% endmacro %}

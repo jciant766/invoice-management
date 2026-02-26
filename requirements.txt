@@ -56,6 +56,9 @@ msal>=1.24.0
 # === SECURITY ===
 # Cryptography - For encrypting OAuth tokens in database
 cryptography>=41.0.0
+passlib>=1.7.4,<1.8.0
+# bcrypt 4.1+ triggers noisy compatibility warnings in passlib 1.7.x
+bcrypt>=4.0.1,<4.1.0
 
 # === AI SERVICE ===
 # HTTPX - Make API calls to OpenRouter (AI service)

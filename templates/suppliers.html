@@ -18,37 +18,36 @@
         </button>
     </div>
 
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="bg-white rounded-lg shadow p-4">
-            <p class="text-sm text-gray-500">Total Suppliers</p>
-            <p class="text-2xl font-bold text-gray-800">{{ stats.total }}</p>
+    <!-- Error Banner -->
+    {% if error %}
+    <div id="errorBanner" class="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-red-700">{{ error }}</span>
         </div>
-        <div class="bg-white rounded-lg shadow p-4">
-            <p class="text-sm text-gray-500">Active</p>
-            <p class="text-2xl font-bold text-green-600">{{ stats.active }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow p-4">
-            <p class="text-sm text-gray-500">Inactive</p>
-            <p class="text-2xl font-bold text-gray-400">{{ stats.inactive }}</p>
-        </div>
+        <button onclick="document.getElementById('errorBanner').remove()" class="text-red-400 hover:text-red-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+    {% endif %}
+
+    <!-- Stats Card -->
+    <div class="bg-white rounded-lg shadow p-4 inline-block">
+        <p class="text-sm text-gray-500">Total Suppliers</p>
+        <p class="text-2xl font-bold text-gray-800">{{ stats.total }}</p>
     </div>
 
-    <!-- Filters and Search -->
+    <!-- Search -->
     <div class="bg-white rounded-lg shadow p-4">
         <form method="GET" class="flex flex-wrap gap-4 items-end">
             <div class="flex-1 min-w-[200px]">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                <input type="text" name="q" value="{{ search_query or '' }}" placeholder="Search by name or email..."
+                <input type="text" name="q" value="{{ search_query or '' }}" placeholder="Search by name, email, phone, or VAT..."
                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select name="status" class="rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
-                    <option value="all" {{ 'selected' if status_filter == 'all' else '' }}>All</option>
-                    <option value="active" {{ 'selected' if status_filter == 'active' else '' }}>Active</option>
-                    <option value="inactive" {{ 'selected' if status_filter == 'inactive' else '' }}>Inactive</option>
-                </select>
             </div>
             <div class="flex gap-2">
                 <button type="submit" class="bg-malta-blue text-white px-4 py-2 rounded-lg hover:bg-malta-blue-dark transition">
@@ -61,63 +60,118 @@
         </form>
     </div>
 
+    <!-- Bulk Action Bar (hidden by default) -->
+    <div id="bulkActionBar" class="bg-malta-blue text-white rounded-lg shadow p-4 hidden">
+        <form id="bulkDeleteForm" method="POST" action="/suppliers/bulk-delete" class="flex items-center justify-between">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+            <input type="hidden" name="supplier_ids" id="selectedIds">
+            <span><strong id="selectedCount">0</strong> suppliers selected</span>
+            <div class="flex gap-2">
+                <button type="button" onclick="clearSelection()" class="px-4 py-2 bg-white text-malta-blue rounded-lg hover:bg-gray-100">
+                    Clear
+                </button>
+                <button type="submit" onclick="return confirm('Delete selected suppliers? Suppliers with invoices will be skipped.')" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    Delete Selected
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Suppliers Table -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
+                    <th class="px-4 py-3 text-center">
+                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="rounded border-gray-300 text-malta-blue focus:ring-malta-blue">
+                    </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Contact</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">VAT No.</th>
                     <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Invoices</th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Total Spend</th>
                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 {% for supplier, invoice_count in suppliers %}
                 <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="font-medium text-gray-900">{{ supplier.name }}</div>
+                    <td class="px-4 py-4 text-center" onclick="event.stopPropagation()">
+                        <input type="checkbox" class="supplier-checkbox rounded border-gray-300 text-malta-blue focus:ring-malta-blue"
+                               data-id="{{ supplier.id }}" data-name="{{ supplier.name }}" data-invoices="{{ invoice_count }}"
+                               onchange="updateSelection()">
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <button type="button"
+                                    class="text-gray-400 hover:text-gray-600 transition"
+                                    onclick="toggleDetails({{ supplier.id }}, event)"
+                                    aria-label="Toggle supplier details"
+                                    aria-controls="details-{{ supplier.id }}"
+                                    aria-expanded="false"
+                                    id="details-toggle-{{ supplier.id }}">
+                                <svg class="w-4 h-4 transition-transform" id="details-icon-{{ supplier.id }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                            <div class="font-medium text-gray-900">{{ supplier.name }}</div>
+                        </div>
+                        {% if supplier.phone %}
+                        <div class="text-sm text-gray-500 md:hidden">{{ supplier.phone }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 hidden md:table-cell">
                         {% if supplier.contact_email %}
-                        <a href="mailto:{{ supplier.contact_email }}" class="text-malta-blue hover:underline">{{ supplier.contact_email }}</a>
+                        <a href="mailto:{{ supplier.contact_email }}" class="text-malta-blue hover:underline text-sm" onclick="event.stopPropagation()">{{ supplier.contact_email }}</a>
+                        {% endif %}
+                        {% if supplier.phone %}
+                        <div class="text-sm text-gray-500">{{ supplier.phone }}</div>
+                        {% endif %}
+                        {% if not supplier.contact_email and not supplier.phone %}
+                        <span class="text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 hidden lg:table-cell">
+                        {% if supplier.vat_number %}
+                        <span class="text-sm text-gray-700">{{ supplier.vat_number }}</span>
                         {% else %}
                         <span class="text-gray-400">-</span>
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-center">
                         {% if invoice_count > 0 %}
-                        <a href="/invoices?supplier={{ supplier.id }}" class="text-malta-blue hover:underline">{{ invoice_count }}</a>
+                        <a href="/invoices?supplier_id={{ supplier.id }}" class="text-malta-blue hover:underline font-medium" onclick="event.stopPropagation()">{{ invoice_count }}</a>
                         {% else %}
                         <span class="text-gray-400">0</span>
                         {% endif %}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-center">
-                        {% if supplier.is_active %}
-                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                    <td class="px-6 py-4 whitespace-nowrap text-right hidden sm:table-cell">
+                        {% if supplier.total_spend > 0 %}
+                        <span class="font-medium text-gray-900">&euro;{{ "{:,.2f}".format(supplier.total_spend) }}</span>
                         {% else %}
-                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Inactive</span>
+                        <span class="text-gray-400">&euro;0.00</span>
                         {% endif %}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right">
-                        <div class="flex justify-end gap-2">
-                            <button onclick="showEditModal({{ supplier.id }}, '{{ supplier.name | e }}', '{{ supplier.contact_email or '' }}', {{ 'true' if supplier.is_active else 'false' }})"
-                                    class="text-malta-blue hover:text-malta-blue-dark" title="Edit">
+                    <td class="px-6 py-4 whitespace-nowrap text-right" onclick="event.stopPropagation()">
+                        <div class="flex justify-end items-center gap-2">
+                            <button onclick="showEditModal({{ supplier.id }}, {{ supplier.name|tojson|forceescape }}, {{ (supplier.contact_email or '')|tojson|forceescape }}, {{ (supplier.phone or '')|tojson|forceescape }}, {{ (supplier.vat_number or '')|tojson|forceescape }}, {{ (supplier.address or '')|tojson|forceescape }}, {{ (supplier.notes or '')|tojson|forceescape }})"
+                                    class="text-malta-blue hover:text-malta-blue-dark" title="Edit" aria-label="Edit supplier">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                 </svg>
                             </button>
                             {% if invoice_count == 0 %}
-                            <form method="POST" action="/suppliers/{{ supplier.id }}/delete" class="inline" onsubmit="return confirm('Delete {{ supplier.name | e }}?')">
-                                <button type="submit" class="text-red-600 hover:text-red-800" title="Delete">
+                            <form method="POST" action="/suppliers/{{ supplier.id }}/delete" class="flex" onsubmit="return confirm('Delete ' + {{ supplier.name|tojson|forceescape }} + '?')">
+                                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                                <button type="submit" class="text-red-600 hover:text-red-800" title="Delete" aria-label="Delete supplier">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                     </svg>
                                 </button>
                             </form>
                             {% else %}
-                            <button onclick="showMergeModal({{ supplier.id }}, '{{ supplier.name | e }}')" class="text-amber-600 hover:text-amber-800" title="Merge">
+                            <button onclick="showMergeModal({{ supplier.id }}, {{ supplier.name|tojson|forceescape }}, {{ invoice_count }})" class="text-amber-600 hover:text-amber-800" title="Merge" aria-label="Merge supplier">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                                 </svg>
@@ -126,9 +180,54 @@
                         </div>
                     </td>
                 </tr>
+                <!-- Expandable Detail Row -->
+                <tr id="details-{{ supplier.id }}" class="hidden bg-gray-50">
+                    <td colspan="7" class="px-6 py-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <span class="font-medium text-gray-500">Email:</span>
+                                {% if supplier.contact_email %}
+                                <a href="mailto:{{ supplier.contact_email }}" class="text-malta-blue hover:underline ml-1">{{ supplier.contact_email }}</a>
+                                {% else %}
+                                <span class="text-gray-400 ml-1">Not set</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-500">Phone:</span>
+                                <span class="text-gray-700 ml-1">{{ supplier.phone or 'Not set' }}</span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-500">VAT Number:</span>
+                                <span class="text-gray-700 ml-1">{{ supplier.vat_number or 'Not set' }}</span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-500">Address:</span>
+                                <span class="text-gray-700 ml-1">{{ supplier.address or 'Not set' }}</span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-500">Total Spend:</span>
+                                <span class="text-gray-700 ml-1">&euro;{{ "{:,.2f}".format(supplier.total_spend) }}</span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-500">Last Invoice:</span>
+                                <span class="text-gray-700 ml-1">{{ supplier.last_invoice_date or 'None' }}</span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-500">Added:</span>
+                                <span class="text-gray-700 ml-1">{{ supplier.created_at[:10] if supplier.created_at else 'Unknown' }}</span>
+                            </div>
+                            {% if supplier.notes %}
+                            <div class="md:col-span-2">
+                                <span class="font-medium text-gray-500">Notes:</span>
+                                <span class="text-gray-700 ml-1">{{ supplier.notes }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                         <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                         </svg>
@@ -141,22 +240,137 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if pagination.total_pages > 1 %}
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 px-4 py-4 border-t">
+            <p class="text-sm text-gray-600">
+                Showing {{ pagination.start_item }}-{{ pagination.end_item }} of {{ pagination.total_count }} suppliers
+            </p>
+            <div class="flex items-center gap-1">
+                <!-- Previous Button -->
+                {% if pagination.has_prev %}
+                <a href="?page={{ pagination.page - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}"
+                   class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    &larr; Previous
+                </a>
+                {% else %}
+                <span class="px-3 py-1.5 text-sm text-gray-400 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed">
+                    &larr; Previous
+                </span>
+                {% endif %}
+
+                <!-- Page Numbers -->
+                <div class="flex items-center gap-1 mx-2">
+                    {% set start_page = [1, pagination.page - 2]|max %}
+                    {% set end_page = [pagination.total_pages, pagination.page + 2]|min %}
+
+                    {% if start_page > 1 %}
+                    <a href="?page=1{% if search_query %}&q={{ search_query }}{% endif %}"
+                       class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        1
+                    </a>
+                    {% if start_page > 2 %}
+                    <span class="px-2 text-gray-400">...</span>
+                    {% endif %}
+                    {% endif %}
+
+                    {% for p in range(start_page, end_page + 1) %}
+                    {% if p == pagination.page %}
+                    <span class="px-3 py-1.5 text-sm text-white bg-malta-blue border border-malta-blue rounded-lg">
+                        {{ p }}
+                    </span>
+                    {% else %}
+                    <a href="?page={{ p }}{% if search_query %}&q={{ search_query }}{% endif %}"
+                       class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        {{ p }}
+                    </a>
+                    {% endif %}
+                    {% endfor %}
+
+                    {% if end_page < pagination.total_pages %}
+                    {% if end_page < pagination.total_pages - 1 %}
+                    <span class="px-2 text-gray-400">...</span>
+                    {% endif %}
+                    <a href="?page={{ pagination.total_pages }}{% if search_query %}&q={{ search_query }}{% endif %}"
+                       class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        {{ pagination.total_pages }}
+                    </a>
+                    {% endif %}
+                </div>
+
+                <!-- Next Button -->
+                {% if pagination.has_next %}
+                <a href="?page={{ pagination.page + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}"
+                   class="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    Next &rarr;
+                </a>
+                {% else %}
+                <span class="px-3 py-1.5 text-sm text-gray-400 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed">
+                    Next &rarr;
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% elif pagination.total_count > 0 %}
+        <div class="px-4 py-3 border-t">
+            <p class="text-sm text-gray-600">
+                Showing all {{ pagination.total_count }} supplier{% if pagination.total_count != 1 %}s{% endif %}
+            </p>
+        </div>
+        {% endif %}
     </div>
 </div>
 
 <!-- Add Supplier Modal -->
 <div id="addModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold text-gray-900 mb-4">Add New Supplier</h3>
         <form method="POST" action="/suppliers/add">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Supplier Name *</label>
-                    <input type="text" name="name" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    <input type="text" name="name" id="addSupplierName" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    <div id="addSimilarWarning" class="hidden mt-2 bg-amber-50 border border-amber-300 rounded-lg p-3">
+                        <div class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-amber-800">Similar suppliers already exist:</p>
+                                <ul id="addSimilarList" class="mt-1 text-sm text-amber-700 space-y-1"></ul>
+                            </div>
+                            <button type="button" onclick="hideSimilarWarning('add')" class="text-amber-400 hover:text-amber-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" name="email" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input type="text" name="phone" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input type="email" name="email" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">VAT Number</label>
+                    <input type="text" name="vat_number" placeholder="e.g. MT12345678" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                    <input type="text" name="address" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea name="notes" rows="2" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue"></textarea>
                 </div>
             </div>
             <div class="mt-6 flex justify-end gap-3">
@@ -173,21 +387,52 @@
 
 <!-- Edit Supplier Modal -->
 <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold text-gray-900 mb-4">Edit Supplier</h3>
         <form id="editForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Supplier Name *</label>
                     <input type="text" name="name" id="editName" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    <div id="editSimilarWarning" class="hidden mt-2 bg-amber-50 border border-amber-300 rounded-lg p-3">
+                        <div class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-amber-800">Similar suppliers already exist:</p>
+                                <ul id="editSimilarList" class="mt-1 text-sm text-amber-700 space-y-1"></ul>
+                            </div>
+                            <button type="button" onclick="hideSimilarWarning('edit')" class="text-amber-400 hover:text-amber-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" name="email" id="editEmail" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input type="text" name="phone" id="editPhone" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input type="email" name="email" id="editEmail" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">VAT Number</label>
+                    <input type="text" name="vat_number" id="editVatNumber" placeholder="e.g. MT12345678" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
                 </div>
-                <div class="flex items-center gap-2">
-                    <input type="checkbox" name="is_active" id="editActive" value="1" class="rounded border-gray-300 text-malta-blue focus:ring-malta-blue">
-                    <label for="editActive" class="text-sm text-gray-700">Active</label>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                    <input type="text" name="address" id="editAddress" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea name="notes" id="editNotes" rows="2" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue"></textarea>
                 </div>
             </div>
             <div class="mt-6 flex justify-end gap-3">
@@ -206,13 +451,18 @@
 <div id="mergeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
     <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h3 class="text-lg font-bold text-gray-900 mb-4">Merge Suppliers</h3>
-        <p class="text-gray-600 mb-4">
-            Merge <strong id="mergeSourceName"></strong> into another supplier. All invoices will be transferred.
+        <p class="text-gray-600 mb-2">
+            Source supplier: <strong id="mergeSourceName"></strong>
+        </p>
+        <p class="text-sm text-gray-500 mb-4">
+            Invoices to transfer: <strong id="mergeSourceCount">0</strong>. This keeps invoices and removes only the source supplier record.
         </p>
         <form id="mergeForm" method="POST" action="/suppliers/merge">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
             <input type="hidden" name="source_id" id="mergeSourceId">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Merge into</label>
+                <input type="text" id="mergeTargetSearch" placeholder="Search target supplier..." class="w-full mb-2 rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue" oninput="filterMergeTargets()">
                 <select name="target_id" id="mergeTarget" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
                     <option value="">-- Select Supplier --</option>
                     {% for supplier, _ in suppliers %}
@@ -248,10 +498,15 @@ function hideAddModal() {
     document.getElementById('addModal').classList.remove('flex');
 }
 
-function showEditModal(id, name, email, isActive) {
+function showEditModal(id, name, email, phone, vatNumber, address, notes) {
+    currentEditSupplierId = id;
+    hideSimilarWarning('edit');
     document.getElementById('editName').value = name;
     document.getElementById('editEmail').value = email;
-    document.getElementById('editActive').checked = isActive;
+    document.getElementById('editPhone').value = phone;
+    document.getElementById('editVatNumber').value = vatNumber;
+    document.getElementById('editAddress').value = address;
+    document.getElementById('editNotes').value = notes;
     document.getElementById('editForm').action = '/suppliers/' + id + '/edit';
     document.getElementById('editModal').classList.remove('hidden');
     document.getElementById('editModal').classList.add('flex');
@@ -262,14 +517,17 @@ function hideEditModal() {
     document.getElementById('editModal').classList.remove('flex');
 }
 
-function showMergeModal(id, name) {
+function showMergeModal(id, name, invoiceCount) {
     document.getElementById('mergeSourceId').value = id;
     document.getElementById('mergeSourceName').textContent = name;
+    document.getElementById('mergeSourceCount').textContent = invoiceCount;
+    document.getElementById('mergeTargetSearch').value = '';
 
     // Disable source option in target select
     const select = document.getElementById('mergeTarget');
     for (let opt of select.options) {
         opt.disabled = (opt.value == id);
+        opt.hidden = false;
     }
     select.value = '';
 
@@ -280,6 +538,43 @@ function showMergeModal(id, name) {
 function hideMergeModal() {
     document.getElementById('mergeModal').classList.add('hidden');
     document.getElementById('mergeModal').classList.remove('flex');
+}
+
+function filterMergeTargets() {
+    const q = document.getElementById('mergeTargetSearch').value.toLowerCase().trim();
+    const sourceId = document.getElementById('mergeSourceId').value;
+    const select = document.getElementById('mergeTarget');
+    for (let i = 0; i < select.options.length; i++) {
+        const opt = select.options[i];
+        if (!opt.value) {
+            opt.hidden = false;
+            continue;
+        }
+        if (opt.value === sourceId) {
+            opt.hidden = true;
+            continue;
+        }
+        opt.hidden = q && !opt.text.toLowerCase().includes(q);
+    }
+}
+
+// Toggle expandable detail row
+function toggleDetails(supplierId, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    var row = document.getElementById('details-' + supplierId);
+    var toggleBtn = document.getElementById('details-toggle-' + supplierId);
+    var toggleIcon = document.getElementById('details-icon-' + supplierId);
+    if (row.classList.contains('hidden')) {
+        row.classList.remove('hidden');
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+        if (toggleIcon) toggleIcon.classList.add('rotate-90');
+    } else {
+        row.classList.add('hidden');
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+        if (toggleIcon) toggleIcon.classList.remove('rotate-90');
+    }
 }
 
 // Close modals on escape
@@ -300,5 +595,107 @@ document.addEventListener('keydown', function(e) {
         }
     });
 });
+
+// --- Multi-select and Bulk Delete ---
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.supplier-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateSelection();
+}
+
+function updateSelection() {
+    const checkboxes = document.querySelectorAll('.supplier-checkbox:checked');
+    const ids = Array.from(checkboxes).map(cb => cb.dataset.id);
+    const bar = document.getElementById('bulkActionBar');
+    const countEl = document.getElementById('selectedCount');
+    const idsInput = document.getElementById('selectedIds');
+
+    countEl.textContent = ids.length;
+    idsInput.value = ids.join(',');
+
+    if (ids.length > 0) {
+        bar.classList.remove('hidden');
+    } else {
+        bar.classList.add('hidden');
+    }
+
+    // Update select all checkbox state
+    const allCheckboxes = document.querySelectorAll('.supplier-checkbox');
+    const selectAll = document.getElementById('selectAll');
+    if (allCheckboxes.length > 0) {
+        selectAll.checked = checkboxes.length === allCheckboxes.length;
+        selectAll.indeterminate = checkboxes.length > 0 && checkboxes.length < allCheckboxes.length;
+    }
+}
+
+function clearSelection() {
+    document.getElementById('selectAll').checked = false;
+    document.querySelectorAll('.supplier-checkbox').forEach(cb => cb.checked = false);
+    updateSelection();
+}
+
+// --- Fuzzy Duplicate Supplier Warning ---
+var addDebounceTimer = null;
+var editDebounceTimer = null;
+var currentEditSupplierId = null;
+
+document.getElementById('addSupplierName').addEventListener('input', function() {
+    clearTimeout(addDebounceTimer);
+    var name = this.value.trim();
+    if (name.length < 2) { hideSimilarWarning('add'); return; }
+    addDebounceTimer = setTimeout(function() { checkSimilarSuppliers(name, 'add', null); }, 500);
+});
+
+document.getElementById('editName').addEventListener('input', function() {
+    clearTimeout(editDebounceTimer);
+    var name = this.value.trim();
+    if (name.length < 2) { hideSimilarWarning('edit'); return; }
+    editDebounceTimer = setTimeout(function() { checkSimilarSuppliers(name, 'edit', currentEditSupplierId); }, 500);
+});
+
+function checkSimilarSuppliers(name, mode, excludeId) {
+    var url = '/suppliers/api/check-similar?name=' + encodeURIComponent(name);
+    if (excludeId) url += '&exclude_id=' + excludeId;
+
+    fetch(url)
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+            if (!data) return;
+            if (data.similar && data.similar.length > 0) {
+                showSimilarWarning(mode, data.similar);
+            } else {
+                hideSimilarWarning(mode);
+            }
+        })
+        .catch(function() {});
+}
+
+function showSimilarWarning(mode, matches) {
+    var warningDiv = document.getElementById(mode + 'SimilarWarning');
+    var listEl = document.getElementById(mode + 'SimilarList');
+    if (!warningDiv || !listEl) return;
+
+    listEl.innerHTML = matches.map(function(m) {
+        var pct = Math.round(m.confidence * 100);
+        var badgeClass = m.confidence >= 0.80 ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800';
+        return '<li><span class="font-medium">' + escapeHtml(m.supplier_name) + '</span> '
+            + '<span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded-full text-xs font-medium ' + badgeClass + '">'
+            + pct + '% match</span></li>';
+    }).join('');
+
+    warningDiv.classList.remove('hidden');
+}
+
+function hideSimilarWarning(mode) {
+    var el = document.getElementById(mode + 'SimilarWarning');
+    if (el) el.classList.add('hidden');
+}
+
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 </script>
 {% endblock %}

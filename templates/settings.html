@@ -27,14 +27,15 @@
         </div>
     </div>
 
+    <!-- Number Counters Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- TF Number Section -->
         <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">TF Number Counter</h3>
+            <h3 class="text-lg font-medium text-gray-900 mb-4">TF Number Counter (Year-based)</h3>
             <div class="space-y-4">
                 <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <span class="text-gray-600">Current TF Number:</span>
-                    <span class="text-xl font-bold text-gray-800">TF {{ current_tf_number }}</span>
+                    <span class="text-gray-600">Current TF ({{ current_year }}):</span>
+                    <span class="text-xl font-bold text-gray-800">{{ current_tf_number }}/{{ current_year }}</span>
                 </div>
                 <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                     <span class="text-gray-600">Next TF Number:</span>
@@ -42,7 +43,8 @@
                 </div>
 
                 <form method="POST" action="/settings/tf-number" class="pt-4 border-t">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Manual TF Counter Adjustment</label>
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Manual TF Counter Adjustment ({{ current_year }})</label>
                     <p class="text-xs text-amber-600 mb-3">Use with caution: This can cause problems if set lower than a number already in use.</p>
                     <div class="flex gap-2">
                         <input type="number" name="new_tf_number" min="0" value="{{ current_tf_number }}" class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
@@ -54,19 +56,216 @@
             </div>
         </div>
 
-        <!-- Database Backup -->
+        <!-- CHQ Number Section -->
         <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Database Backup</h3>
-            <p class="text-sm text-gray-600 mb-4">
-                Download a copy of the database to keep a backup of all invoices.
-            </p>
-            <a href="/settings/backup" class="inline-flex items-center px-4 py-2 bg-malta-blue text-white rounded-lg hover:bg-malta-blue-dark transition">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                </svg>
-                Download Backup
-            </a>
+            <h3 class="text-lg font-medium text-gray-900 mb-4">CHQ Number Counter (Year-based)</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span class="text-gray-600">Current CHQ ({{ current_year }}):</span>
+                    <span class="text-xl font-bold text-gray-800">{{ current_chq_number }}/{{ current_year }}</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <span class="text-gray-600">Next CHQ Number:</span>
+                    <span class="text-xl font-bold text-green-600">{{ next_chq_number }}</span>
+                </div>
+
+                <form method="POST" action="/settings/chq-number" class="pt-4 border-t">
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Manual CHQ Counter Adjustment ({{ current_year }})</label>
+                    <p class="text-xs text-amber-600 mb-3">Use with caution: This can cause problems if set lower than a number already in use.</p>
+                    <div class="flex gap-2">
+                        <input type="number" name="new_chq_number" min="0" value="{{ current_chq_number }}" class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-malta-blue focus:ring-malta-blue">
+                        <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition">
+                            Update
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
+    </div>
+
+    <!-- PJV Info Note -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p class="text-sm text-blue-800">
+            <strong>Note:</strong> PJV numbers are manual input with no specific format or structure. Enter them directly when creating invoices.
+        </p>
+    </div>
+
+    <!-- Database Backup Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- System Backup -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">System Backup (DB + Receipts)</h3>
+
+            <!-- Backup Stats -->
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <p class="text-xs text-gray-500">Total Backups</p>
+                    <p class="text-lg font-bold text-gray-800">{{ backup_stats.total_backups }}</p>
+                </div>
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <p class="text-xs text-gray-500">Storage Used</p>
+                    <p class="text-lg font-bold text-gray-800">{{ backup_stats.total_size_mb }} MB</p>
+                </div>
+            </div>
+
+            <!-- Backup Actions -->
+            <div class="flex gap-2 mb-4">
+                <form method="POST" action="/settings/backup/create" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Create Full Backup
+                    </button>
+                </form>
+                <a href="/settings/backup" class="inline-flex items-center px-4 py-2 bg-malta-blue text-white rounded-lg hover:bg-malta-blue-dark transition">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    Download Current DB
+                </a>
+            </div>
+
+            <p class="text-xs text-gray-500">
+                Full backups include database and fiscal receipt files. "Download Current DB" is database-only.
+            </p>
+        </div>
+    </div>
+
+    <!-- Backup List -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Backup History</h3>
+
+        {% if backups %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for backup in backups[:10] %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ backup.date }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            {% if backup.reason == 'manual' %}
+                            <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">Manual</span>
+                            {% elif backup.reason == 'auto-daily' %}
+                            <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Auto Daily</span>
+                            {% elif backup.reason == 'pre-restore' %}
+                            <span class="px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-800">Pre-Restore</span>
+                            {% else %}
+                            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{{ backup.reason }}</span>
+                            {% endif %}
+                            {% if backup.backup_type == 'full' %}
+                            <span class="ml-1 px-2 py-1 text-xs rounded-full bg-emerald-100 text-emerald-800">Full</span>
+                            {% else %}
+                            <span class="ml-1 px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-700">DB</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ backup.size_mb }} MB</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-right text-sm">
+                            <div class="flex justify-end gap-2">
+                                <a href="/settings/backup/{{ backup.filename }}/download" class="text-malta-blue hover:text-malta-blue-dark" title="Download">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                </a>
+                                <form method="POST" action="/settings/backup/{{ backup.filename }}/restore" class="inline" onsubmit="return confirm('Restore this backup snapshot? This will replace current data.');">
+                                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                                    <button type="submit" class="text-amber-600 hover:text-amber-700" title="Restore">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                                <form method="POST" action="/settings/backup/{{ backup.filename }}/delete" class="inline" onsubmit="return confirm('Delete this backup?');">
+                                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token | default('') }}">
+                                    <button type="submit" class="text-red-600 hover:text-red-700" title="Delete">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if backups|length > 10 %}
+        <p class="text-sm text-gray-500 mt-3">Showing 10 of {{ backups|length }} backups</p>
+        {% endif %}
+        {% else %}
+        <div class="text-center py-8 text-gray-500">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+            </svg>
+            <p>No backups yet</p>
+            <p class="text-sm">Click "Create Backup" to create your first backup</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Security Section -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Security</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Encryption Status -->
+            <div class="p-4 rounded-lg {% if encryption.encryption_enabled %}bg-green-50 border border-green-200{% else %}bg-amber-50 border border-amber-200{% endif %}">
+                <div class="flex items-center gap-3">
+                    {% if encryption.encryption_enabled %}
+                    <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-medium text-green-800">Database Encrypted</p>
+                        <p class="text-sm text-green-600">SQLCipher 256-bit AES encryption active</p>
+                    </div>
+                    {% else %}
+                    <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-medium text-amber-800">Database Not Encrypted</p>
+                        <p class="text-sm text-amber-600">
+                            {% if not encryption.sqlcipher_available %}
+                            SQLCipher not installed
+                            {% elif not encryption.key_configured %}
+                            DATABASE_KEY not configured
+                            {% else %}
+                            Encryption disabled
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Database Path -->
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <p class="text-xs text-gray-500 uppercase mb-1">Database Location</p>
+                <p class="text-sm font-mono text-gray-700 truncate" title="{{ encryption.database_path }}">{{ encryption.database_path }}</p>
+            </div>
+        </div>
+
+        {% if not encryption.encryption_enabled %}
+        <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <p class="text-sm text-blue-800">
+                <strong>To enable encryption:</strong><br>
+                1. Install SQLCipher: <code class="bg-blue-100 px-1 rounded">pip install sqlcipher3-binary</code><br>
+                2. Add to .env: <code class="bg-blue-100 px-1 rounded">DATABASE_KEY=YourSecretKey123!</code><br>
+                3. Run: <code class="bg-blue-100 px-1 rounded">python tools/encrypt_database.py</code>
+            </p>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Quick Link to Suppliers -->

@@ -6,11 +6,19 @@ Handles PDF to image conversion and image processing for AI vision API.
 
 import io
 import base64
-from typing import List, Dict, Any, Optional
+import logging
+from typing import List, Dict, Any, Optional, Tuple
 from PIL import Image
 
+logger = logging.getLogger(__name__)
 
-def pdf_to_images(pdf_data: bytes) -> List[bytes]:
+
+class PDFConversionError(Exception):
+    """Exception raised when PDF conversion fails."""
+    pass
+
+
+def pdf_to_images(pdf_data: bytes) -> Tuple[List[bytes], Optional[str]]:
     """
     Convert PDF to list of images (one per page).
 
@@ -18,7 +26,7 @@ def pdf_to_images(pdf_data: bytes) -> List[bytes]:
         pdf_data: PDF file data as bytes
 
     Returns:
-        List of image data as bytes (PNG format)
+        Tuple of (List of image data as bytes (PNG format), error message if any)
     """
     try:
         # Try using pdf2image (requires poppler)
@@ -33,10 +41,13 @@ def pdf_to_images(pdf_data: bytes) -> List[bytes]:
         )
         if os.path.exists(local_poppler):
             poppler_path = local_poppler
-            print(f"Using local poppler: {poppler_path}")
+            logger.debug(f"Using local poppler: {poppler_path}")
 
         # Convert PDF to images (one per page)
         images = convert_from_bytes(pdf_data, poppler_path=poppler_path)
+
+        if not images:
+            return [], "PDF conversion produced no images"
 
         # Convert PIL images to PNG bytes
         image_bytes_list = []
@@ -45,16 +56,23 @@ def pdf_to_images(pdf_data: bytes) -> List[bytes]:
             img.save(img_byte_arr, format='PNG')
             image_bytes_list.append(img_byte_arr.getvalue())
 
-        return image_bytes_list
+        return image_bytes_list, None
 
-    except ImportError:
-        print("Warning: pdf2image not installed. PDF attachments will be skipped.")
-        print("Install with: pip install pdf2image")
-        print("Note: Also requires poppler - see https://pdf2image.readthedocs.io/")
-        return []
+    except ImportError as e:
+        error_msg = "pdf2image not installed. Install with: pip install pdf2image (also requires poppler)"
+        logger.warning(error_msg)
+        return [], error_msg
     except Exception as e:
-        print(f"Error converting PDF to images: {e}")
-        return []
+        error_msg = f"PDF conversion failed: {str(e)}"
+        logger.error(error_msg)
+        # Check for common errors
+        if "poppler" in str(e).lower():
+            error_msg = "Poppler not found. Please install poppler or add it to PATH"
+        elif "password" in str(e).lower():
+            error_msg = "PDF is password protected"
+        elif "corrupt" in str(e).lower() or "invalid" in str(e).lower():
+            error_msg = "PDF file appears to be corrupted or invalid"
+        return [], error_msg
 
 
 def image_to_base64(image_data: bytes) -> str:
@@ -101,11 +119,11 @@ def resize_image_if_needed(image_data: bytes, max_size: int = 2048) -> bytes:
         return image_data
 
     except Exception as e:
-        print(f"Error resizing image: {e}")
+        logger.error(f"Error resizing image: {e}")
         return image_data
 
 
-def prepare_attachments_for_vision(attachments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def prepare_attachments_for_vision(attachments: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[str]]:
     """
     Prepare attachments for vision API by converting PDFs and encoding images.
 
@@ -113,9 +131,10 @@ def prepare_attachments_for_vision(attachments: List[Dict[str, Any]]) -> List[Di
         attachments: List of attachment dictionaries with 'data', 'mime_type', 'filename'
 
     Returns:
-        List of processed attachments ready for vision API
+        Tuple of (List of processed attachments ready for vision API, List of error messages)
     """
     processed = []
+    errors = []
 
     for attachment in attachments:
         mime_type = attachment.get('mime_type', '')
@@ -123,12 +142,17 @@ def prepare_attachments_for_vision(attachments: List[Dict[str, Any]]) -> List[Di
         filename = attachment.get('filename', 'unknown')
 
         if not data:
+            errors.append(f"Attachment '{filename}' has no data")
             continue
 
         # Handle PDFs - convert to images
         if mime_type == 'application/pdf':
-            print(f"Converting PDF to images: {filename}")
-            images = pdf_to_images(data)
+            logger.info(f"Converting PDF to images: {filename}")
+            images, error = pdf_to_images(data)
+
+            if error:
+                errors.append(f"PDF '{filename}': {error}")
+                # Continue processing other attachments
 
             for i, img_data in enumerate(images):
                 # Resize if needed
@@ -139,20 +163,26 @@ def prepare_attachments_for_vision(attachments: List[Dict[str, Any]]) -> List[Di
                     'mime_type': 'image/png',
                     'data': img_data,
                     'base64': image_to_base64(img_data),
-                    'filename': f"{filename}_page_{i+1}.png"
+                    'filename': f"{filename}_page_{i+1}.png",
+                    'original_filename': filename,
+                    'is_pdf_page': True
                 })
 
         # Handle images
         elif mime_type.startswith('image/'):
-            # Resize if needed
-            data = resize_image_if_needed(data)
+            try:
+                # Resize if needed
+                data = resize_image_if_needed(data)
 
-            processed.append({
-                'type': 'image',
-                'mime_type': mime_type,
-                'data': data,
-                'base64': image_to_base64(data),
-                'filename': filename
-            })
+                processed.append({
+                    'type': 'image',
+                    'mime_type': mime_type,
+                    'data': data,
+                    'base64': image_to_base64(data),
+                    'filename': filename,
+                    'is_pdf_page': False
+                })
+            except Exception as e:
+                errors.append(f"Image '{filename}': {str(e)}")
 
-    return processed
+    return processed, errors

@@ -5,9 +5,11 @@ Handles OAuth2 authentication and email retrieval from Gmail.
 Supports both file-based tokens (legacy) and database-stored OAuth tokens.
 """
 
+import logging
 import os
 import base64
 import email
+import time
 from email.header import decode_header
 from typing import Optional, List, Dict, Any
 from pathlib import Path
@@ -17,9 +19,14 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+logger = logging.getLogger(__name__)
+
 # Gmail API scopes - readonly is sufficient for reading emails
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly',
           'https://www.googleapis.com/auth/gmail.modify']
+
+# Maximum attachment size (10MB)
+MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
 
 
 class GmailService:
@@ -76,7 +83,7 @@ class GmailService:
             profile = self.service.users().getProfile(userId='me').execute()
             return profile.get('emailAddress')
         except Exception as e:
-            print(f"Error getting Gmail profile: {e}")
+            logger.error(f"Error getting Gmail profile: {e}")
             return None
 
     def _authenticate(self):
@@ -136,7 +143,7 @@ class GmailService:
             label: Gmail label to search in
 
         Returns:
-            List of email dictionaries with id, subject, from, date, body
+            List of email dictionaries with id, subject, from, date, snippet
         """
         try:
             # Search for emails with query
@@ -150,16 +157,105 @@ class GmailService:
             messages = results.get('messages', [])
             emails = []
 
-            for msg in messages:
-                email_data = self.get_email_by_id(msg['id'])
-                if email_data:
-                    emails.append(email_data)
+            # Use batch request to fetch metadata for all emails efficiently
+            # This is MUCH faster than individual requests
+            if messages:
+                emails = self._batch_get_email_metadata(messages)
 
             return emails
 
         except HttpError as error:
-            print(f"Gmail API error: {error}")
+            logger.error(f"Gmail API error: {error}")
             return []
+
+    def _batch_get_email_metadata(self, messages: List[Dict]) -> List[Dict[str, Any]]:
+        """
+        Fetch email metadata for multiple messages using batch requests.
+        Only fetches headers and snippet - NOT full body (much faster).
+
+        Args:
+            messages: List of message objects with 'id' key
+
+        Returns:
+            List of email metadata dictionaries
+        """
+        emails = []
+
+        # Use smaller batch size to avoid Gmail rate limits (429 errors)
+        # Gmail allows 100 per batch but rate limits concurrent requests
+        batch_size = 50
+
+        for i in range(0, len(messages), batch_size):
+            batch_messages = messages[i:i + batch_size]
+
+            # Create batch request
+            batch = self.service.new_batch_http_request()
+
+            def create_callback(msg_id):
+                def callback(request_id, response, exception):
+                    if exception:
+                        logger.error(f"Error fetching email {msg_id}: {exception}")
+                        return
+
+                    headers = response.get('payload', {}).get('headers', [])
+
+                    subject = ''
+                    sender = ''
+                    date = ''
+
+                    for header in headers:
+                        name = header.get('name', '').lower()
+                        if name == 'subject':
+                            subject = header.get('value', '')
+                        elif name == 'from':
+                            sender = header.get('value', '')
+                        elif name == 'date':
+                            date = header.get('value', '')
+
+                    emails.append({
+                        'id': response['id'],
+                        'thread_id': response.get('threadId', ''),
+                        'subject': subject,
+                        'from': sender,
+                        'date': date,
+                        'snippet': response.get('snippet', ''),
+                        'body': '',  # Not fetched in list view for speed
+                        'attachments': []  # Not fetched in list view
+                    })
+                return callback
+
+            # Add each message to the batch - only fetch metadata, not full content
+            for msg in batch_messages:
+                batch.add(
+                    self.service.users().messages().get(
+                        userId='me',
+                        id=msg['id'],
+                        format='metadata',  # Only headers, much faster!
+                        metadataHeaders=['Subject', 'From', 'Date']
+                    ),
+                    callback=create_callback(msg['id'])
+                )
+
+            # Execute batch with retry on rate limit
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    batch.execute()
+                    break
+                except HttpError as e:
+                    if e.resp.status == 429 and attempt < max_retries - 1:
+                        # Rate limited - wait and retry
+                        wait_time = (attempt + 1) * 2  # 2s, 4s, 6s
+                        logger.warning(f"Rate limited, waiting {wait_time}s before retry...")
+                        time.sleep(wait_time)
+                    else:
+                        raise
+
+            # Small delay between batches to avoid rate limiting
+            if i + batch_size < len(messages):
+                time.sleep(0.3)  # 300ms between batches
+
+        return emails
 
     def get_email_by_id(self, email_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -212,7 +308,7 @@ class GmailService:
             }
 
         except HttpError as error:
-            print(f"Error fetching email {email_id}: {error}")
+            logger.error(f"Error fetching email {email_id}: {error}")
             return None
 
     def get_thread_messages(self, thread_id: str) -> List[Dict[str, Any]]:
@@ -276,7 +372,7 @@ class GmailService:
             return email_list
 
         except HttpError as error:
-            print(f"Error fetching thread {thread_id}: {error}")
+            logger.error(f"Error fetching thread {thread_id}: {error}")
             return []
 
     def _get_email_body(self, payload: Dict) -> str:
@@ -342,6 +438,12 @@ class GmailService:
                     attachment_id = part.get('body', {}).get('attachmentId')
 
                     if attachment_id:
+                        # Check estimated size before downloading (body.size is in bytes)
+                        estimated_size = part.get('body', {}).get('size', 0)
+                        if estimated_size > MAX_ATTACHMENT_SIZE:
+                            logger.warning(f"Skipping attachment {filename}: too large ({estimated_size} bytes, max {MAX_ATTACHMENT_SIZE})")
+                            continue
+
                         try:
                             # Download attachment data
                             attachment = self.service.users().messages().attachments().get(
@@ -353,6 +455,11 @@ class GmailService:
                             # Decode attachment data
                             data = base64.urlsafe_b64decode(attachment['data'])
 
+                            # Verify actual size after decoding
+                            if len(data) > MAX_ATTACHMENT_SIZE:
+                                logger.warning(f"Skipping attachment {filename}: decoded size too large ({len(data)} bytes)")
+                                continue
+
                             attachments.append({
                                 'filename': filename,
                                 'mime_type': mime_type,
@@ -360,10 +467,10 @@ class GmailService:
                                 'size': len(data)
                             })
 
-                            print(f"Downloaded attachment: {filename} ({mime_type}, {len(data)} bytes)")
+                            logger.debug(f"Downloaded attachment: {filename} ({mime_type}, {len(data)} bytes)")
 
                         except HttpError as error:
-                            print(f"Error downloading attachment {filename}: {error}")
+                            logger.error(f"Error downloading attachment {filename}: {error}")
 
                 # Recursively check nested multipart
                 elif mime_type.startswith('multipart/'):
@@ -390,7 +497,7 @@ class GmailService:
             ).execute()
             return True
         except HttpError as error:
-            print(f"Error marking email as read: {error}")
+            logger.error(f"Error marking email as read: {error}")
             return False
 
     def add_label(self, email_id: str, label_name: str) -> bool:
@@ -418,7 +525,7 @@ class GmailService:
             return False
 
         except HttpError as error:
-            print(f"Error adding label: {error}")
+            logger.error(f"Error adding label: {error}")
             return False
 
     def _get_or_create_label(self, label_name: str) -> Optional[str]:
@@ -445,8 +552,79 @@ class GmailService:
             return created['id']
 
         except HttpError as error:
-            print(f"Error with labels: {error}")
+            logger.error(f"Error with labels: {error}")
             return None
+
+    def list_labels(self) -> List[Dict[str, Any]]:
+        """
+        List all labels (folders) in the user's Gmail account.
+
+        Returns:
+            List of label dictionaries with id, name, type
+        """
+        try:
+            results = self.service.users().labels().list(userId='me').execute()
+            labels = results.get('labels', [])
+
+            # Get detailed info for each label
+            folder_list = []
+            for label in labels:
+                label_type = label.get('type', 'user')
+
+                # Skip system labels we don't want to show
+                if label['id'] in ['SPAM', 'TRASH', 'DRAFT', 'SENT', 'STARRED',
+                                   'IMPORTANT', 'CHAT', 'CATEGORY_PERSONAL',
+                                   'CATEGORY_SOCIAL', 'CATEGORY_PROMOTIONS',
+                                   'CATEGORY_UPDATES', 'CATEGORY_FORUMS']:
+                    continue
+
+                # Get message count for user labels
+                total_items = 0
+                if label_type == 'user':
+                    try:
+                        label_info = self.service.users().labels().get(
+                            userId='me',
+                            id=label['id']
+                        ).execute()
+                        total_items = label_info.get('messagesTotal', 0)
+                    except Exception:
+                        pass
+
+                folder_list.append({
+                    "id": label['id'],
+                    "name": label['name'],
+                    "type": label_type,
+                    "total_items": total_items
+                })
+
+            # Sort: INBOX first, then user labels alphabetically
+            def sort_key(l):
+                if l['id'] == 'INBOX':
+                    return (0, '')
+                if l['type'] == 'system':
+                    return (1, l['name'])
+                return (2, l['name'])
+
+            folder_list.sort(key=sort_key)
+
+            return folder_list
+
+        except HttpError as error:
+            logger.error(f"Error listing labels: {error}")
+            return []
+
+    def get_emails_from_label(self, label_id: str, max_results: int = 50) -> List[Dict[str, Any]]:
+        """
+        Fetch emails from a specific label (folder).
+
+        Args:
+            label_id: Gmail label ID
+            max_results: Maximum number of emails to retrieve
+
+        Returns:
+            List of email dictionaries
+        """
+        return self.search_emails(query='', max_results=max_results, label=label_id)
 
 
 # Singleton instance
@@ -469,10 +647,10 @@ def get_gmail_service() -> Optional[GmailService]:
         _gmail_service_instance = GmailService()
         return _gmail_service_instance
     except FileNotFoundError as e:
-        print(f"Gmail setup required: {e}")
+        logger.warning(f"Gmail setup required: {e}")
         return None
     except Exception as e:
-        print(f"Gmail service error: {e}")
+        logger.error(f"Gmail service error: {e}")
         return None
 
 
@@ -503,7 +681,7 @@ def get_gmail_service_oauth() -> Optional[GmailService]:
         return _gmail_service_instance
 
     except Exception as e:
-        print(f"Gmail OAuth service error: {e}")
+        logger.error(f"Gmail OAuth service error: {e}")
         return None
 
 
